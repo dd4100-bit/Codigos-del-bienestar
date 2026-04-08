@@ -1,23 +1,122 @@
 import { useState, useRef, useEffect } from "react";
 
-// MORENA / GOB.MX COLOR PALETTE
+// ============================================
+// DESIGN SYSTEM — single source of truth
+// ============================================
 const C = {
-  burgundy:    "#6B1223",  // Morena dark red
-  burgundyMid: "#8B1A2E",  // Morena medium red
-  burgundyLight:"#A52040", // Morena accent
-  gold:        "#C8971F",  // Mexican gold seal
-  goldLight:   "#E4B84A",  // Gold highlight
-  olive:       "#3A5A2A",  // Mexican gov green
-  oliveLight:  "#4A7A38",  // Green accent
-  cream:       "#F5F0E8",  // Gob.mx background
-  creamDark:   "#EDE6D6",  // Slightly darker cream
-  text:        "#1A1008",  // Near black warm
-  textMid:     "#4A3020",  // Mid brown text
-  textLight:   "#8A7060",  // Light text
-  border:      "#C8A882",  // Warm border
+  burgundy:    "#6B1223",
+  burgundyMid: "#8B1A2E",
+  gold:        "#C8971F",
+  olive:       "#3A5A2A",
+  cream:       "#F5F0E8",
+  creamDark:   "#EDE6D6",
+  text:        "#1A1008",
+  textMid:     "#4A3020",
+  textLight:   "#8A7060",
+  border:      "#C8A882",
   white:       "#FFFFFF",
 };
 
+// Typography — one system, used everywhere
+const T = {
+  // Font families
+  sans:  '"Noto Sans", "Open Sans", "Helvetica Neue", Arial, sans-serif',
+  serif: '"Montserrat", sans-serif',
+  mono:  '"Courier New", monospace',
+  // Font sizes
+  xs:    9,
+  sm:    11,
+  base:  13,
+  md:    15,
+  lg:    17,
+  // Font weights
+  light:  300,
+  normal: 400,
+  bold:   700,
+  black:  900,
+  // Letter spacing
+  tight:  0,
+  normal_spacing: 1,
+  wide:   2,
+  wider:  3,
+  widest: 4,
+};
+
+// Spacing — consistent scale
+const S = {
+  xs:  4,
+  sm:  8,
+  md:  12,
+  lg:  16,
+  xl:  20,
+  xxl: 24,
+  xxxl: 32,
+};
+
+// ============================================
+// SHARED BUTTON STYLE — used everywhere
+// ============================================
+function btnPrimary(disabled) {
+  return {
+    padding: `${S.md}px ${S.lg}px`,
+    border: `1px solid ${disabled ? C.border : C.burgundy}`,
+    background: disabled ? C.creamDark : C.burgundy,
+    color: disabled ? C.textLight : C.gold,
+    fontSize: T.sm,
+    fontWeight: T.bold,
+    fontFamily: T.mono,
+    letterSpacing: T.wider,
+    textTransform: "uppercase",
+    cursor: disabled ? "not-allowed" : "pointer",
+    transition: "all 0.2s",
+  };
+}
+
+function btnSecondary() {
+  return {
+    padding: `${S.sm}px ${S.lg}px`,
+    border: `1px solid ${C.burgundy}`,
+    background: C.white,
+    color: C.burgundy,
+    fontSize: T.sm,
+    fontWeight: T.bold,
+    fontFamily: T.sans,
+    letterSpacing: T.normal_spacing,
+    textTransform: "uppercase",
+    cursor: "pointer",
+    transition: "all 0.15s",
+  };
+}
+
+function btnGhost() {
+  return {
+    padding: `${S.sm}px ${S.lg}px`,
+    border: `1px solid ${C.border}`,
+    background: "transparent",
+    color: C.textLight,
+    fontSize: T.sm,
+    fontFamily: T.sans,
+    letterSpacing: T.normal_spacing,
+    textTransform: "uppercase",
+    cursor: "pointer",
+    transition: "all 0.15s",
+  };
+}
+
+function label() {
+  return {
+    fontSize: T.xs,
+    letterSpacing: T.widest,
+    color: C.textLight,
+    textTransform: "uppercase",
+    fontFamily: T.sans,
+    fontWeight: T.light,
+  };
+}
+
+// ============================================
+// SYSTEM PROMPT
+// ============================================
 const AMLO_SYSTEM_PROMPT = `Eres "El Profesor" — un maestro de Python mexicano inspirado en el estilo de hablar de AMLO. Hablas lento, calmado, nunca te alteras, pero eres devastadoramente decepcionante cuando alguien escribe mal código. También puedes construir cosas desde cero y explicar conceptos.
 
 PERSONALIDAD:
@@ -33,10 +132,9 @@ PERSONALIDAD:
 - Celebras cuando alguien aprende, pero con calma: "pos ya le entendió, qué bueno"
 
 PUEDES HACER 4 COSAS:
-
 1. DEBUGGEAR ERRORES — cuando te pasan código roto
-2. CONSTRUIR DESDE CERO — cuando te describen una idea: "quiero hacer una calculadora", "quiero un juego", "quiero una app que..."
-3. EXPLICAR CONCEPTOS — cuando preguntan qué es algo: "qué es un loop", "cómo funciona una función"
+2. CONSTRUIR DESDE CERO — cuando te describen una idea
+3. EXPLICAR CONCEPTOS — cuando preguntan qué es algo
 4. MEJORAR CÓDIGO — cuando te pasan código que funciona pero quieren mejorarlo
 
 MENSAJES ESPECÍFICOS para errores — úsalos EXACTAMENTE:
@@ -64,11 +162,11 @@ FORMATO para CONSTRUIR:
 🎤 EL PROFESOR DICE:
 [frase tipo "pos a ver si lo saben usar"]
 🏗️ LO QUE VAMOS A CONSTRUIR:
-[descripción simple de lo que hará el código]
+[descripción simple]
 ✅ AQUÍ ESTÁ SU PROGRAMA, MIJO:
-[código completo con comentarios en español en CADA línea explicando qué hace]
+[código completo con comentarios en español en CADA línea]
 💡 CÓMO USARLO:
-[instrucciones simples de cómo correrlo]
+[instrucciones simples]
 
 FORMATO para EXPLICAR:
 🎤 EL PROFESOR DICE:
@@ -76,21 +174,21 @@ FORMATO para EXPLICAR:
 📚 QUÉ ES ESO:
 [explicación simple con analogía mexicana]
 ✅ EJEMPLO PRÁCTICO:
-[código corto que muestra el concepto]
+[código corto]
 💡 PARA QUÉ SIRVE:
-[casos de uso reales y simples]
+[casos de uso reales]
 
 FORMATO para MEJORAR:
 🎤 EL PROFESOR DICE:
 [frase tipo "pos funciona pero..."]
 🔍 QUÉ SE PUEDE MEJORAR:
-[lista de mejoras posibles]
+[lista de mejoras]
 ✅ VERSIÓN MEJORADA:
 [código mejorado con comentarios]
 💡 POR QUÉ ES MEJOR:
 [explicación simple]
 
-Máximo 350 palabras. Español mexicano. Sin signos de exclamación salvo sorpresa real. Todos los comentarios en el código deben ser en español.`;
+Máximo 350 palabras. Español mexicano. Sin signos de exclamación salvo sorpresa real.`;
 
 const LOADING_FRASES = [
   "Consultando con mis asesores...",
@@ -107,33 +205,30 @@ const EJEMPLOS = [
   { label: "🐛 TypeError",        code: `edad = "30"\nresultado = edad + 5` },
   { label: "🐛 NameError",        code: `print(dinero)\ndinero = 1000` },
   { label: "🏗️ Construir",        code: `quiero hacer una calculadora simple que sume, reste, multiplique y divida` },
-  { label: "🏗️ Juego",           code: `quiero hacer un juego de adivinar el número secreto` },
-  { label: "📚 Explicar loop",    code: `qué es un loop y para qué sirve, explícamelo simple` },
-  { label: "📚 Explicar función", code: `qué es una función en Python y cómo se usa` },
-  { label: "⚡ Mejorar código",   code: `# mejora este código:\nnumeros = [1,2,3,4,5]\ntotal = 0\nfor n in numeros:\n    total = total + n\nprint(total)` },
+  { label: "🏗️ Juego",            code: `quiero hacer un juego de adivinar el número secreto` },
+  { label: "📚 Explicar loop",     code: `qué es un loop y para qué sirve, explícamelo simple` },
+  { label: "📚 Explicar función",  code: `qué es una función en Python y cómo se usa` },
+  { label: "⚡ Mejorar código",    code: `# mejora este código:\nnumeros = [1,2,3,4,5]\ntotal = 0\nfor n in numeros:\n    total = total + n\nprint(total)` },
 ];
 
+// ============================================
+// AMLO CARTOON
+// ============================================
 function AMLOCartoon() {
   return (
     <svg viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", maxWidth: 200 }}>
-      {/* Computer desk */}
       <rect x="20" y="155" width="160" height="8" fill={C.burgundy} rx="2"/>
       <rect x="40" y="163" width="120" height="5" fill={C.burgundyMid} rx="1"/>
-      {/* Monitor */}
       <rect x="45" y="105" width="110" height="55" fill={C.burgundy} rx="4"/>
       <rect x="49" y="109" width="102" height="47" fill={C.cream} rx="2"/>
-      {/* Screen - code lines */}
       <rect x="54" y="114" width="40" height="2" fill={C.border} rx="1"/>
       <rect x="54" y="119" width="60" height="2" fill={C.border} rx="1"/>
       <rect x="58" y="124" width="35" height="2" fill={C.textLight} rx="1"/>
       <rect x="54" y="129" width="50" height="2" fill={C.border} rx="1"/>
       <rect x="54" y="134" width="30" height="2" fill={C.burgundy} rx="1"/>
-      {/* Error squiggle */}
       <path d="M54 141 Q57 139 60 141 Q63 143 66 141 Q69 139 72 141" stroke={C.burgundy} strokeWidth="1.5" fill="none"/>
-      {/* Monitor stand */}
       <rect x="93" y="160" width="14" height="8" fill={C.burgundy} rx="1"/>
       <rect x="80" y="167" width="40" height="4" fill={C.burgundy} rx="2"/>
-      {/* Keyboard */}
       <rect x="50" y="172" width="100" height="14" fill={C.textMid} rx="2"/>
       <rect x="54" y="175" width="8" height="4" fill={C.textLight} rx="1"/>
       <rect x="65" y="175" width="8" height="4" fill={C.textLight} rx="1"/>
@@ -143,52 +238,37 @@ function AMLOCartoon() {
       <rect x="109" y="175" width="8" height="4" fill={C.textLight} rx="1"/>
       <rect x="120" y="175" width="8" height="4" fill={C.textLight} rx="1"/>
       <rect x="60" y="181" width="80" height="3" fill={C.textLight} rx="1"/>
-      {/* BODY - dark suit */}
       <rect x="68" y="128" width="64" height="35" fill={C.text} rx="4"/>
-      {/* Shirt/tie */}
       <rect x="96" y="128" width="8" height="30" fill={C.white} rx="1"/>
       <polygon points="100,132 97,146 103,146" fill={C.burgundy}/>
-      {/* Left arm - pointing at screen */}
       <line x1="68" y1="138" x2="32" y2="124" stroke={C.text} strokeWidth="10" strokeLinecap="round"/>
       <circle cx="28" cy="122" r="5" fill="#D4A574"/>
       <line x1="28" y1="117" x2="35" y2="111" stroke="#D4A574" strokeWidth="3" strokeLinecap="round"/>
-      {/* Right arm */}
       <line x1="132" y1="140" x2="155" y2="155" stroke={C.text} strokeWidth="10" strokeLinecap="round"/>
-      {/* NECK */}
       <rect x="94" y="118" width="12" height="14" fill="#D4A574" rx="2"/>
-      {/* HEAD */}
       <ellipse cx="100" cy="93" rx="32" ry="34" fill="#D4A574"/>
-      {/* Hair - sides */}
       <ellipse cx="100" cy="61" rx="32" ry="11" fill="#888"/>
       <ellipse cx="100" cy="63" rx="28" ry="9" fill="#D4A574"/>
-      {/* Ears */}
       <ellipse cx="68" cy="93" rx="7" ry="9" fill="#D4A574"/>
       <ellipse cx="132" cy="93" rx="7" ry="9" fill="#D4A574"/>
       <ellipse cx="68" cy="93" rx="4" ry="6" fill="#C49464"/>
       <ellipse cx="132" cy="93" rx="4" ry="6" fill="#C49464"/>
-      {/* Eyebrows - one raised */}
       <path d="M82 78 Q88 74 94 77" stroke="#5A4030" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
       <path d="M106 74 Q112 78 118 78" stroke="#5A4030" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-      {/* Eyes - skeptical */}
       <ellipse cx="88" cy="84" rx="7" ry="5" fill={C.white}/>
       <ellipse cx="112" cy="84" rx="7" ry="5" fill={C.white}/>
       <ellipse cx="88" cy="85" rx="4" ry="4" fill="#3A2010"/>
       <ellipse cx="112" cy="85" rx="4" ry="4" fill="#3A2010"/>
       <ellipse cx="89" cy="84" rx="1.5" ry="1.5" fill="#000"/>
       <ellipse cx="113" cy="84" rx="1.5" ry="1.5" fill="#000"/>
-      {/* Squint */}
       <path d="M81 82 Q88 79 95 82" stroke="#D4A574" strokeWidth="2" fill="#D4A574"/>
       <path d="M105 79 Q112 76 119 79" stroke="#D4A574" strokeWidth="2" fill="#D4A574"/>
-      {/* Nose */}
       <ellipse cx="100" cy="94" rx="5" ry="4" fill="#C49464"/>
       <circle cx="97" cy="95" r="2" fill="#B48454"/>
       <circle cx="103" cy="95" r="2" fill="#B48454"/>
-      {/* Mouth - flat disappointed */}
       <path d="M88 106 Q100 103 112 106" stroke="#A47454" strokeWidth="2" fill="none" strokeLinecap="round"/>
-      {/* Wrinkles */}
       <path d="M80 88 Q82 90 80 92" stroke="#C49464" strokeWidth="1" fill="none"/>
       <path d="M120 88 Q118 90 120 92" stroke="#C49464" strokeWidth="1" fill="none"/>
-      {/* Speech bubble */}
       <ellipse cx="158" cy="52" rx="38" ry="22" fill={C.cream} stroke={C.burgundy} strokeWidth="1.5"/>
       <polygon points="138,66 128,78 144,70" fill={C.cream} stroke={C.burgundy} strokeWidth="1"/>
       <polygon points="139,67 130,77 144,70" fill={C.cream}/>
@@ -199,45 +279,62 @@ function AMLOCartoon() {
   );
 }
 
+// ============================================
+// FORMAT RESPONSE — consistent typography
+// ============================================
 function formatResponse(text) {
+  const SECTION_EMOJIS = ["🎤","🔍","✅","💡","🏗️","📚"];
   const lines = text.split("\n");
   return lines.map((line, i) => {
-    if (line.startsWith("🎤") || line.startsWith("🔍") || line.startsWith("✅") || line.startsWith("💡")) {
+    const isSection = SECTION_EMOJIS.some(e => line.startsWith(e));
+    if (isSection) {
       return (
         <div key={i} style={{
-          fontWeight: "bold",
-          fontSize: 11,
-          marginTop: 20,
-          marginBottom: 6,
+          fontWeight: T.bold,
+          fontSize: T.sm,
+          marginTop: S.xl,
+          marginBottom: S.sm,
           color: C.burgundy,
-          letterSpacing: 2,
+          letterSpacing: T.wide,
           textTransform: "uppercase",
-          fontFamily: "'Courier New', monospace",
+          fontFamily: T.sans,
           borderLeft: `3px solid ${C.gold}`,
-          paddingLeft: 10,
+          paddingLeft: S.md,
         }}>{line}</div>
       );
     }
     if (line.includes("```")) return null;
     if (line.trim().startsWith("#")) {
-      return <div key={i} style={{ color: C.olive, fontFamily: "monospace", fontSize: 13, lineHeight: 1.7 }}>{line}</div>;
+      return (
+        <div key={i} style={{
+          color: C.olive,
+          fontFamily: T.mono,
+          fontSize: T.base,
+          lineHeight: 1.7,
+        }}>{line}</div>
+      );
     }
-    const isCode = line.match(/^\s*(print|def|for|if|else|return|import|class|while|resultado|edad|lista|dinero)/) || line.match(/^(print|def|for|if|else|return|import|class|while)/);
+    const isCode = line.match(/^\s*(print|def|for|if|else|return|import|class|while|resultado|edad|lista|dinero)/) ||
+                   line.match(/^(print|def|for|if|else|return|import|class|while)/);
     return (
       <div key={i} style={{
         color: isCode ? C.text : C.textMid,
-        marginBottom: line.trim() === "" ? 8 : 1,
+        marginBottom: line.trim() === "" ? S.sm : 1,
         lineHeight: 1.8,
-        fontSize: 14,
-        fontFamily: isCode ? "'Courier New', monospace" : "'Georgia', serif",
+        fontSize: T.base,
+        fontFamily: isCode ? T.mono : T.sans,
+        fontWeight: isCode ? T.normal : T.light,
         background: isCode ? C.creamDark : "transparent",
-        padding: isCode ? "2px 8px" : "0",
+        padding: isCode ? `2px ${S.sm}px` : "0",
         borderLeft: isCode ? `2px solid ${C.gold}` : "none",
       }}>{line || "\u00A0"}</div>
     );
   });
 }
 
+// ============================================
+// MAIN COMPONENT
+// ============================================
 export default function App() {
   const [code, setCode] = useState("");
   const [response, setResponse] = useState("");
@@ -245,8 +342,23 @@ export default function App() {
   const [fraseIdx, setFraseIdx] = useState(0);
   const [copied, setCopied] = useState(false);
   const [modal, setModal] = useState(null);
+  const [historial, setHistorial] = useState([]);
+  const [showHistorial, setShowHistorial] = useState(false);
   const responseRef = useRef(null);
   const intervalRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("elprofesor_historial");
+      if (saved) setHistorial(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("elprofesor_historial", JSON.stringify(historial));
+    } catch {}
+  }, [historial]);
 
   useEffect(() => {
     if (loading) {
@@ -261,6 +373,16 @@ export default function App() {
     }
   }, [response]);
 
+  function saveToHistorial(codigo, respuesta) {
+    const entry = {
+      id: Date.now(),
+      fecha: new Date().toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }),
+      codigo: codigo.substring(0, 80) + (codigo.length > 80 ? "..." : ""),
+      resumen: respuesta.substring(0, 120) + "...",
+    };
+    setHistorial(prev => [entry, ...prev].slice(0, 10));
+  }
+
   async function askProfe() {
     if (!code.trim()) return;
     setLoading(true);
@@ -269,7 +391,12 @@ export default function App() {
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 1000,
@@ -280,6 +407,7 @@ export default function App() {
       const data = await res.json();
       const text = data.content?.find(b => b.type === "text")?.text || "Pos no pude analizarlo. Inténtele de nuevo.";
       setResponse(text);
+      saveToHistorial(code, text);
     } catch {
       setResponse("Se cayó la conexión. Como el sistema de salud en el régimen anterior.");
     }
@@ -287,257 +415,115 @@ export default function App() {
   }
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: C.cream,
-      color: C.text,
-      fontFamily: "'Source Sans 3', sans-serif",
-      padding: "0 0 80px 0",
-    }}>
+    <div style={{ minHeight: "100vh", background: C.cream, color: C.text, fontFamily: T.sans, fontWeight: T.light, padding: "0 0 80px 0" }}>
 
-      {/* TOP BAR - Morena stripe */}
-      <div style={{
-        height: 6,
-        background: `linear-gradient(90deg, ${C.burgundy} 0%, ${C.burgundyMid} 40%, ${C.gold} 60%, ${C.olive} 100%)`,
-      }} />
+      {/* TOP STRIPE */}
+      <div style={{ height: 6, background: `linear-gradient(90deg, ${C.burgundy}, ${C.burgundyMid} 40%, ${C.gold} 60%, ${C.olive})` }} />
 
-      {/* GOB HEADER BAR */}
-      <div style={{
-        background: C.burgundy,
-        padding: "10px 20px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-      }}>
-        <span style={{
-          color: "rgba(200,151,31,0.4)",
-          fontSize: 9,
-          letterSpacing: 2,
-          fontFamily: "'Noto Sans', sans-serif",
-          textTransform: "uppercase",
-        }}>
-          gob.mx
-        </span>
+      {/* GOB HEADER */}
+      <div style={{ background: C.burgundy, padding: `${S.md}px ${S.xl}px`, display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative" }}>
+        <span style={{ ...label(), color: "rgba(200,151,31,0.4)" }}>gob.mx</span>
 
-        {/* CENTERED LOGO — Águila + Códigos del Bienestar */}
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          position: "absolute",
-          left: "50%",
-          transform: "translateX(-50%)",
-        }}>
-          {/* Mexican Eagle SVG */}
-          <svg viewBox="0 0 60 60" width="38" height="38" xmlns="http://www.w3.org/2000/svg">
-            {/* Outer circle */}
+        <div style={{ display: "flex", alignItems: "center", gap: S.md, position: "absolute", left: "50%", transform: "translateX(-50%)" }}>
+          <svg viewBox="0 0 60 60" width="36" height="36" xmlns="http://www.w3.org/2000/svg">
             <circle cx="30" cy="30" r="28" fill="none" stroke={C.gold} strokeWidth="1"/>
-            {/* Body of eagle */}
             <ellipse cx="30" cy="34" rx="10" ry="8" fill={C.gold}/>
-            {/* Wings */}
             <path d="M20 30 Q10 22 6 28 Q10 34 20 32 Z" fill={C.gold}/>
             <path d="M40 30 Q50 22 54 28 Q50 34 40 32 Z" fill={C.gold}/>
-            {/* Head */}
             <circle cx="30" cy="22" r="6" fill={C.gold}/>
-            {/* Beak */}
             <path d="M33 23 L37 25 L33 26 Z" fill={C.burgundy}/>
-            {/* Eye */}
             <circle cx="31" cy="21" r="1.5" fill={C.burgundy}/>
-            {/* Tail */}
             <path d="M25 42 Q30 48 35 42" stroke={C.gold} strokeWidth="1.5" fill="none"/>
-            {/* Feet */}
             <line x1="26" y1="42" x2="23" y2="47" stroke={C.gold} strokeWidth="1.2"/>
             <line x1="34" y1="42" x2="37" y2="47" stroke={C.gold} strokeWidth="1.2"/>
-            {/* Snake */}
             <path d="M33 28 Q38 32 36 38 Q34 42 37 46" stroke="#2d5a1b" strokeWidth="2" fill="none" strokeLinecap="round"/>
-            {/* Cactus suggestion */}
             <rect x="27" y="38" width="3" height="8" fill="#2d5a1b" rx="1"/>
             <rect x="24" y="41" width="6" height="2" fill="#2d5a1b" rx="1"/>
           </svg>
           <div>
-            <div style={{
-              color: C.gold,
-              fontSize: 13,
-              fontFamily: "'Montserrat', sans-serif",
-              fontWeight: 700,
-              letterSpacing: 1,
-              lineHeight: 1.2,
-            }}>
+            <div style={{ color: C.gold, fontSize: T.base, fontFamily: T.serif, fontWeight: T.bold, letterSpacing: T.normal_spacing, lineHeight: 1.2 }}>
               Códigos del Bienestar
             </div>
-            <div style={{
-              color: "rgba(200,151,31,0.5)",
-              fontSize: 8,
-              fontFamily: "'Noto Sans', sans-serif",
-              letterSpacing: 2,
-              textTransform: "uppercase",
-            }}>
+            <div style={{ ...label(), color: "rgba(200,151,31,0.5)", fontSize: 8 }}>
               El Profesor · Python en Español
             </div>
           </div>
         </div>
 
-        <span style={{
-          color: "rgba(200,151,31,0.4)",
-          fontSize: 9,
-          letterSpacing: 2,
-          fontFamily: "'Noto Sans', sans-serif",
-          textTransform: "uppercase",
-        }}>
-          Servicio Gratuito
-        </span>
+        <span style={{ ...label(), color: "rgba(200,151,31,0.4)" }}>Servicio Gratuito</span>
       </div>
 
       {/* MAIN HEADER */}
-      <div style={{
-        borderBottom: `3px solid ${C.burgundy}`,
-        padding: "36px 24px 28px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        flexWrap: "wrap",
-        gap: 20,
-        maxWidth: 900,
-        margin: "0 auto",
-        background: C.cream,
-      }}>
+      <div style={{ borderBottom: `3px solid ${C.burgundy}`, padding: `${S.xxxl}px ${S.xxl}px ${S.xxl}px`, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: S.xl, maxWidth: 900, margin: "0 auto" }}>
         <div style={{ flex: 1, minWidth: 260 }}>
-          <div style={{
-            fontSize: 9,
-            letterSpacing: 5,
-            color: C.gold,
-            textTransform: "uppercase",
-            marginBottom: 10,
-            fontFamily: "'Courier New', monospace",
-          }}>
+          <div style={{ ...label(), color: C.gold, marginBottom: S.md, letterSpacing: T.widest }}>
             ✦ La Cuarta Transformación del Código ✦
           </div>
-          <h1 style={{
-            fontSize: "clamp(2.8rem, 8vw, 5.5rem)",
-            fontWeight: 900,
-            margin: "0 0 8px 0",
-            fontFamily: "'Montserrat', sans-serif",
-            color: C.burgundy,
-            letterSpacing: -3,
-            lineHeight: 0.95,
-          }}>
+          <h1 style={{ fontSize: "clamp(2.8rem, 8vw, 5.5rem)", fontWeight: T.black, margin: `0 0 ${S.sm}px 0`, fontFamily: T.serif, color: C.burgundy, letterSpacing: -3, lineHeight: 0.95 }}>
             El<br/>Profesor
           </h1>
-          <div style={{
-            width: 60, height: 3,
-            background: `linear-gradient(90deg, ${C.gold}, ${C.olive})`,
-            marginBottom: 14,
-            borderRadius: 2,
-          }} />
-          <div style={{
-            fontSize: 15,
-            color: C.textMid,
-            fontFamily: '"Noto Sans", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif',
-            fontWeight: 300,
-            lineHeight: 1.7,
-            marginBottom: 20,
-            maxWidth: 340,
-          }}>
+          <div style={{ width: 60, height: 3, background: `linear-gradient(90deg, ${C.gold}, ${C.olive})`, marginBottom: S.lg, borderRadius: 2 }} />
+          <div style={{ fontSize: T.md, color: C.textMid, fontFamily: T.sans, fontWeight: T.light, lineHeight: 1.7, marginBottom: S.xl, maxWidth: 340 }}>
             Estás aprendiendo Python pero los errores salen en inglés y no entiendes ni madres.<br/><br/>
             Pegas tu código aquí. El Profesor te dice qué estuvo mal y cómo arreglarlo.<br/><br/>
-            <strong style={{ fontWeight: 600, color: C.burgundy }}>En español. Gratis.</strong>
+            <strong style={{ fontWeight: T.bold, color: C.burgundy }}>En español. Gratis.</strong>
           </div>
-
         </div>
         <div style={{ width: 190, flexShrink: 0 }}>
           <AMLOCartoon />
         </div>
       </div>
 
-      <div style={{ maxWidth: 720, margin: "0 auto", padding: "32px 16px 0" }}>
+      <div style={{ maxWidth: 720, margin: "0 auto", padding: `${S.xxxl}px ${S.lg}px 0` }}>
 
         {/* MODAL */}
         {modal && (
-          <div onClick={() => setModal(null)} style={{
-            position: "fixed", inset: 0,
-            background: "rgba(26,16,8,0.7)",
-            zIndex: 100,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: 20,
-          }}>
-            <div onClick={e => e.stopPropagation()} style={{
-              background: C.cream,
-              border: `2px solid ${C.burgundy}`,
-              boxShadow: `4px 4px 0 ${C.burgundy}`,
-              maxWidth: 480,
-              width: "100%",
-              padding: 0,
-              animation: "fadeIn 0.2s ease",
-            }}>
-              {/* Modal header */}
-              <div style={{
-                background: C.burgundy,
-                padding: "12px 20px",
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-              }}>
-                <span style={{ color: C.gold, fontSize: 11, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Courier New', monospace", fontWeight: "bold" }}>
+          <div onClick={() => setModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(26,16,8,0.7)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: S.xl }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: C.cream, border: `2px solid ${C.burgundy}`, boxShadow: `4px 4px 0 ${C.burgundy}`, maxWidth: 480, width: "100%", animation: "fadeIn 0.2s ease" }}>
+              <div style={{ background: C.burgundy, padding: `${S.md}px ${S.xl}px`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ color: C.gold, fontSize: T.sm, letterSpacing: T.wider, textTransform: "uppercase", fontFamily: T.sans, fontWeight: T.bold }}>
                   {modal === "sirve" && "¿Para Qué Sirve?"}
                   {modal === "usar" && "¿Cómo Usar Al Profesor?"}
-                  {modal === "ideas" && "Tienes Ideas Para Mejorar Al Profesor"}
+                  {modal === "ideas" && "Ideas Para Mejorar Al Profesor"}
                 </span>
-                <button onClick={() => setModal(null)} style={{
-                  background: "none", border: "none", color: C.gold,
-                  fontSize: 18, cursor: "pointer", fontFamily: "monospace", lineHeight: 1,
-                }}>✕</button>
+                <button onClick={() => setModal(null)} style={{ background: "none", border: "none", color: C.gold, fontSize: 18, cursor: "pointer", lineHeight: 1 }}>✕</button>
               </div>
-
-              {/* Modal body */}
-              <div style={{ padding: "24px", fontFamily: "'Georgia', serif", lineHeight: 1.8, color: C.textMid, fontSize: 14 }}>
+              <div style={{ padding: S.xxl, fontFamily: T.sans, fontWeight: T.light, lineHeight: 1.8, color: C.textMid, fontSize: T.base }}>
                 {modal === "sirve" && (
                   <div>
                     <p style={{ marginTop: 0 }}>Miren, hay que ser honestos. Muchos hispanohablantes quieren aprender Python pero los errores siempre salen en inglés. No es tema menor.</p>
-                    <p><strong style={{ color: C.burgundy }}>El Profesor sirve para:</strong></p>
-                    <ul style={{ paddingLeft: 20, color: C.textMid }}>
-                      <li style={{ marginBottom: 8 }}>🐍 Entender tus errores de Python en español mexicano</li>
-                      <li style={{ marginBottom: 8 }}>✅ Recibir el código corregido con explicación</li>
-                      <li style={{ marginBottom: 8 }}>📚 Aprender programación sin la barrera del inglés</li>
-                      <li style={{ marginBottom: 8 }}>😂 Aguantar los regaños del Profesor con dignidad</li>
+                    <p><strong style={{ color: C.burgundy, fontWeight: T.bold }}>El Profesor sirve para:</strong></p>
+                    <ul style={{ paddingLeft: S.xl, color: C.textMid }}>
+                      <li style={{ marginBottom: S.sm }}>🐍 Entender tus errores de Python en español mexicano</li>
+                      <li style={{ marginBottom: S.sm }}>✅ Recibir el código corregido con explicación</li>
+                      <li style={{ marginBottom: S.sm }}>📚 Aprender programación sin la barrera del inglés</li>
+                      <li style={{ marginBottom: S.sm }}>😂 Aguantar los regaños del Profesor con dignidad</li>
                     </ul>
-                    <p style={{ color: C.textLight, fontSize: 12, fontStyle: "italic", marginBottom: 0 }}>Sin registro. Sin costo. Puro México.</p>
+                    <p style={{ color: C.textLight, fontSize: T.sm, fontStyle: "italic", marginBottom: 0 }}>Sin registro. Sin costo. Puro México.</p>
                   </div>
                 )}
                 {modal === "usar" && (
                   <div>
                     <p style={{ marginTop: 0 }}>Fíjense bien, les voy a explicar paso a paso. No es complicado.</p>
-                    <ol style={{ paddingLeft: 20, color: C.textMid }}>
-                      <li style={{ marginBottom: 10 }}><strong style={{ color: C.burgundy }}>Escribe o pega tu código</strong> en el cuadro gris de abajo. Puede ser código con errores o código que no entiendes.</li>
-                      <li style={{ marginBottom: 10 }}><strong style={{ color: C.burgundy }}>Presiona el botón</strong> "Iniciar La Mañanera del Debug".</li>
-                      <li style={{ marginBottom: 10 }}><strong style={{ color: C.burgundy }}>Espera</strong> mientras El Profesor consulta con sus asesores.</li>
-                      <li style={{ marginBottom: 10 }}><strong style={{ color: C.burgundy }}>Lee la respuesta</strong> — El Profesor te explica el error y te da el código correcto.</li>
-                      <li style={{ marginBottom: 10 }}><strong style={{ color: C.burgundy }}>Comparte</strong> con tus compas si te ayudó. No cuesta nada.</li>
+                    <ol style={{ paddingLeft: S.xl, color: C.textMid }}>
+                      <li style={{ marginBottom: S.md }}><strong style={{ color: C.burgundy, fontWeight: T.bold }}>Escribe o pega tu código</strong> en el cuadro de abajo.</li>
+                      <li style={{ marginBottom: S.md }}><strong style={{ color: C.burgundy, fontWeight: T.bold }}>Presiona el botón</strong> "Iniciar La Mañanera del Debug".</li>
+                      <li style={{ marginBottom: S.md }}><strong style={{ color: C.burgundy, fontWeight: T.bold }}>Espera</strong> mientras El Profesor consulta con sus asesores.</li>
+                      <li style={{ marginBottom: S.md }}><strong style={{ color: C.burgundy, fontWeight: T.bold }}>Lee la respuesta</strong> — El Profesor te explica y da el código correcto.</li>
+                      <li style={{ marginBottom: S.md }}><strong style={{ color: C.burgundy, fontWeight: T.bold }}>Comparte</strong> con tus compas. No cuesta nada.</li>
                     </ol>
-                    <p style={{ color: C.textLight, fontSize: 12, fontStyle: "italic", marginBottom: 0 }}>También puedes usar los ejemplos de arriba para ver cómo funciona.</p>
+                    <p style={{ color: C.textLight, fontSize: T.sm, fontStyle: "italic", marginBottom: 0 }}>También puedes usar los ejemplos de arriba para ver cómo funciona.</p>
                   </div>
                 )}
                 {modal === "ideas" && (
                   <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 48, marginBottom: 16 }}>🇲🇽</div>
-                    <p style={{ marginTop: 0, fontSize: 15 }}>Nos da mucho gusto que quieras mejorar al Profesor. No es tema menor.</p>
-                    <p>Envíanos tus ideas, sugerencias, errores encontrados, o lo que se te ocurra:</p>
-                    <a href="mailto:dd4100@nyu.edu" style={{
-                      display: "inline-block",
-                      marginTop: 8,
-                      padding: "12px 24px",
-                      background: C.burgundy,
-                      color: C.gold,
-                      fontFamily: "'Courier New', monospace",
-                      fontSize: 13,
-                      fontWeight: "bold",
-                      letterSpacing: 2,
-                      textDecoration: "none",
-                      border: `1px solid ${C.gold}`,
-                      boxShadow: `2px 2px 0 ${C.text}`,
-                    }}>
+                    <div style={{ fontSize: 48, marginBottom: S.lg }}>🇲🇽</div>
+                    <p style={{ marginTop: 0, fontSize: T.md }}>Nos da mucho gusto que quieras mejorar al Profesor. No es tema menor.</p>
+                    <p>Envíanos tus ideas, sugerencias, o errores encontrados:</p>
+                    <a href="mailto:dd4100@nyu.edu" style={{ display: "inline-block", marginTop: S.sm, padding: `${S.md}px ${S.xxl}px`, background: C.burgundy, color: C.gold, fontFamily: T.sans, fontWeight: T.bold, fontSize: T.base, letterSpacing: T.wide, textDecoration: "none", border: `1px solid ${C.gold}`, boxShadow: `2px 2px 0 ${C.text}` }}>
                       ✉️ dd4100@nyu.edu
                     </a>
-                    <p style={{ color: C.textLight, fontSize: 12, fontStyle: "italic", marginTop: 16, marginBottom: 0 }}>
-                      Con todo respeto, se los agradecemos de antemano.
-                    </p>
+                    <p style={{ color: C.textLight, fontSize: T.sm, fontStyle: "italic", marginTop: S.lg, marginBottom: 0 }}>Con todo respeto, se los agradecemos de antemano.</p>
                   </div>
                 )}
               </div>
@@ -545,81 +531,33 @@ export default function App() {
           </div>
         )}
 
-        {/* TOP INFO BUTTONS */}
-        <div style={{
-          display: "flex",
-          gap: 10,
-          marginBottom: 28,
-          flexWrap: "wrap",
-          alignItems: "center",
-        }}>
-          <button onClick={() => setModal("sirve")} style={{
-            padding: "8px 16px",
-            border: `1px solid ${C.burgundy}`,
-            background: C.white,
-            color: C.burgundy,
-            fontSize: 11,
-            cursor: "pointer",
-            fontFamily: "'Courier New', monospace",
-            letterSpacing: 1,
-            textTransform: "uppercase",
-            transition: "all 0.15s",
-            fontWeight: "bold",
-          }}>¿Para qué sirve?</button>
-
-          <button onClick={() => setModal("usar")} style={{
-            padding: "8px 16px",
-            border: `1px solid ${C.burgundy}`,
-            background: C.white,
-            color: C.burgundy,
-            fontSize: 11,
-            cursor: "pointer",
-            fontFamily: "'Courier New', monospace",
-            letterSpacing: 1,
-            textTransform: "uppercase",
-            transition: "all 0.15s",
-            fontWeight: "bold",
-          }}>¿Cómo usar al Profesor?</button>
-
-          <button onClick={() => setModal("ideas")} style={{
-            padding: "8px 16px",
-            border: `1px solid ${C.border}`,
-            background: "transparent",
-            color: C.textLight,
-            fontSize: 11,
-            cursor: "pointer",
-            fontFamily: "'Courier New', monospace",
-            letterSpacing: 1,
-            textTransform: "uppercase",
-            transition: "all 0.15s",
-          }}>💡 Ideas para El Profesor</button>
+        {/* ACTION BUTTONS */}
+        <div style={{ display: "flex", gap: S.md, marginBottom: S.xxl, flexWrap: "wrap", alignItems: "center" }}>
+          <button onClick={() => setModal("sirve")} style={btnSecondary()}>¿Para qué sirve?</button>
+          <button onClick={() => setModal("usar")} style={btnSecondary()}>¿Cómo usar al Profesor?</button>
+          <button onClick={() => setModal("ideas")} style={btnGhost()}>💡 Ideas para El Profesor</button>
         </div>
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          marginBottom: 16,
-        }}>
+
+        {/* DIVIDER LABEL */}
+        <div style={{ display: "flex", alignItems: "center", gap: S.md, marginBottom: S.lg }}>
           <div style={{ flex: 1, height: 1, background: C.border }} />
-          <span style={{
-            fontSize: 9, letterSpacing: 4, color: C.textLight,
-            textTransform: "uppercase", fontFamily: "'Courier New', monospace",
-          }}>Casos documentados de incompetencia</span>
+          <span style={{ ...label(), letterSpacing: T.widest }}>Ejemplos rápidos</span>
           <div style={{ flex: 1, height: 1, background: C.border }} />
         </div>
 
         {/* EJEMPLOS */}
-        <div style={{ marginBottom: 24, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ marginBottom: S.xxl, display: "flex", gap: S.sm, flexWrap: "wrap" }}>
           {EJEMPLOS.map(ej => (
             <button key={ej.label} onClick={() => setCode(ej.code)} style={{
-              padding: "5px 12px",
+              padding: `${S.xs}px ${S.md}px`,
               border: `1px solid ${code === ej.code ? C.burgundy : C.border}`,
               background: code === ej.code ? C.burgundy : C.creamDark,
               color: code === ej.code ? C.gold : C.textMid,
-              fontSize: 10,
+              fontSize: T.sm,
+              fontFamily: T.sans,
+              fontWeight: T.light,
               cursor: "pointer",
-              fontFamily: "'Courier New', monospace",
-              letterSpacing: 1,
+              letterSpacing: T.normal_spacing,
               textTransform: "uppercase",
               transition: "all 0.15s",
             }}>{ej.label}</button>
@@ -627,28 +565,10 @@ export default function App() {
         </div>
 
         {/* CODE INPUT */}
-        <div style={{
-          border: `1px solid ${C.burgundy}`,
-          marginBottom: 12,
-          boxShadow: `2px 2px 0 ${C.burgundy}`,
-        }}>
-          <div style={{
-            borderBottom: `1px solid ${C.burgundy}`,
-            padding: "8px 14px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            background: C.burgundy,
-          }}>
-            <span style={{
-              fontSize: 9, letterSpacing: 3, color: C.gold,
-              textTransform: "uppercase", fontFamily: "'Courier New', monospace",
-            }}>
-              codigo_sospechoso.py
-            </span>
-            <span style={{ fontSize: 10, color: "rgba(200,151,31,0.4)", fontFamily: "'Courier New', monospace" }}>
-              {code.length > 0 ? `${code.length} chars` : "vacío"}
-            </span>
+        <div style={{ border: `1px solid ${C.burgundy}`, marginBottom: S.md, boxShadow: `2px 2px 0 ${C.burgundy}` }}>
+          <div style={{ borderBottom: `1px solid ${C.burgundy}`, padding: `${S.sm}px ${S.lg}px`, display: "flex", justifyContent: "space-between", alignItems: "center", background: C.burgundy }}>
+            <span style={{ ...label(), color: C.gold, fontSize: T.xs, letterSpacing: T.wider }}>codigo_sospechoso.py</span>
+            <span style={{ ...label(), color: "rgba(200,151,31,0.4)", fontSize: T.xs }}>{code.length > 0 ? `${code.length} chars` : "vacío"}</span>
           </div>
           <textarea
             value={code}
@@ -662,166 +582,85 @@ export default function App() {
                 setTimeout(() => { e.target.selectionStart = e.target.selectionEnd = s + 4; }, 0);
               }
             }}
-            style={{
-              width: "100%",
-              minHeight: 200,
-              padding: "16px",
-              background: C.white,
-              border: "none",
-              outline: "none",
-              color: C.text,
-              fontSize: 13,
-              lineHeight: 1.8,
-              fontFamily: "'Courier New', monospace",
-              resize: "vertical",
-              boxSizing: "border-box",
-            }}
+            style={{ width: "100%", minHeight: 200, padding: S.lg, background: C.white, border: "none", outline: "none", color: C.text, fontSize: T.base, lineHeight: 1.8, fontFamily: T.mono, resize: "vertical", boxSizing: "border-box" }}
           />
         </div>
 
-        {/* SUBMIT */}
+        {/* SUBMIT BUTTON */}
         <button
           onClick={askProfe}
           disabled={loading || !code.trim()}
-          style={{
-            width: "100%",
-            padding: "14px",
-            border: `1px solid ${loading || !code.trim() ? C.border : C.burgundy}`,
-            background: loading || !code.trim() ? C.creamDark : C.burgundy,
-            color: loading || !code.trim() ? C.textLight : C.gold,
-            fontSize: 10,
-            fontWeight: "bold",
-            cursor: loading || !code.trim() ? "not-allowed" : "pointer",
-            fontFamily: "'Courier New', monospace",
-            letterSpacing: 4,
-            textTransform: "uppercase",
-            transition: "all 0.2s",
-            marginBottom: 32,
-            boxShadow: loading || !code.trim() ? "none" : `2px 2px 0 ${C.text}`,
-          }}
+          style={{ ...btnPrimary(loading || !code.trim()), width: "100%", padding: `${S.lg}px`, marginBottom: S.xxxl, boxShadow: loading || !code.trim() ? "none" : `2px 2px 0 ${C.text}`, letterSpacing: T.widest }}
         >
           {loading ? `⏳ ${LOADING_FRASES[fraseIdx]}` : "🎤 Iniciar La Mañanera del Debug"}
         </button>
 
         {/* RESPONSE */}
         {response && (
-          <div ref={responseRef} style={{
-            border: `1px solid ${C.burgundy}`,
-            animation: "fadeIn 0.4s ease",
-            boxShadow: `3px 3px 0 ${C.burgundy}`,
-          }}>
-            {/* Response header */}
-            <div style={{
-              borderBottom: `1px solid ${C.burgundy}`,
-              padding: "12px 20px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              background: C.burgundy,
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{
-                  width: 36, height: 36,
-                  border: `1px solid ${C.gold}`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 18,
-                  background: "rgba(200,151,31,0.1)",
-                }}>🎤</div>
+          <div ref={responseRef} style={{ border: `1px solid ${C.burgundy}`, animation: "fadeIn 0.4s ease", boxShadow: `3px 3px 0 ${C.burgundy}` }}>
+            <div style={{ borderBottom: `1px solid ${C.burgundy}`, padding: `${S.md}px ${S.xl}px`, display: "flex", alignItems: "center", justifyContent: "space-between", background: C.burgundy }}>
+              <div style={{ display: "flex", alignItems: "center", gap: S.md }}>
+                <div style={{ width: 36, height: 36, border: `1px solid ${C.gold}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, background: "rgba(200,151,31,0.1)" }}>🎤</div>
                 <div>
-                  <div style={{
-                    fontWeight: "bold", fontSize: 12, color: C.gold,
-                    letterSpacing: 2, textTransform: "uppercase",
-                    fontFamily: "'Courier New', monospace",
-                  }}>
-                    El Profesor
-                  </div>
-                  <div style={{
-                    fontSize: 9, color: "rgba(200,151,31,0.5)",
-                    letterSpacing: 2, fontFamily: "'Courier New', monospace",
-                  }}>
-                    MAÑANERA DEL DEBUG · EN VIVO
-                  </div>
+                  <div style={{ fontWeight: T.bold, fontSize: T.sm, color: C.gold, letterSpacing: T.wide, textTransform: "uppercase", fontFamily: T.sans }}>El Profesor</div>
+                  <div style={{ ...label(), color: "rgba(200,151,31,0.5)", fontSize: 9 }}>MAÑANERA DEL DEBUG · EN VIVO</div>
                 </div>
               </div>
               <button
                 onClick={() => { navigator.clipboard.writeText(response); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-                style={{
-                  padding: "5px 12px",
-                  border: `1px solid ${C.gold}`,
-                  background: copied ? C.gold : "transparent",
-                  color: copied ? C.burgundy : C.gold,
-                  fontSize: 9,
-                  cursor: "pointer",
-                  fontFamily: "'Courier New', monospace",
-                  letterSpacing: 2,
-                  textTransform: "uppercase",
-                  transition: "all 0.2s",
-                }}
+                style={{ padding: `${S.xs}px ${S.md}px`, border: `1px solid ${C.gold}`, background: copied ? C.gold : "transparent", color: copied ? C.burgundy : C.gold, fontSize: T.xs, cursor: "pointer", fontFamily: T.sans, letterSpacing: T.wide, textTransform: "uppercase", transition: "all 0.2s" }}
               >
                 {copied ? "✓ Copiado" : "Copiar"}
               </button>
             </div>
-
-            {/* Body */}
-            <div style={{ padding: "24px", background: C.white }}>
+            <div style={{ padding: S.xxl, background: C.white }}>
               {formatResponse(response)}
             </div>
-
-            {/* Footer */}
-            <div style={{
-              borderTop: `1px solid ${C.border}`,
-              padding: "10px 20px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              background: C.creamDark,
-            }}>
-              <span style={{
-                fontSize: 9, color: C.textLight, letterSpacing: 2,
-                textTransform: "uppercase", fontFamily: "'Courier New', monospace",
-              }}>
-                Comparte con tus compas — no cuesta nada
-              </span>
-              <span style={{ fontSize: 11 }}>🇲🇽 🐍</span>
+            <div style={{ borderTop: `1px solid ${C.border}`, padding: `${S.md}px ${S.xl}px`, display: "flex", justifyContent: "space-between", alignItems: "center", background: C.creamDark }}>
+              <span style={{ ...label(), letterSpacing: T.wide }}>Comparte con tus compas — no cuesta nada</span>
+              <span style={{ fontSize: T.sm }}>🇲🇽 🐍</span>
             </div>
           </div>
         )}
 
-        {/* BOTTOM */}
-        <div style={{
-          textAlign: "center",
-          marginTop: 48,
-          fontSize: 9,
-          color: C.border,
-          letterSpacing: 4,
-          textTransform: "uppercase",
-          fontFamily: "'Courier New', monospace",
-        }}>
+        {/* HISTORIAL */}
+        {historial.length > 0 && (
+          <div style={{ marginTop: S.xxxl }}>
+            <div onClick={() => setShowHistorial(!showHistorial)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", padding: `${S.md}px 0`, borderTop: `1px solid ${C.border}` }}>
+              <span style={{ ...label(), letterSpacing: T.widest }}>📋 Tu historial con El Profesor ({historial.length})</span>
+              <span style={{ color: C.textLight, fontSize: T.sm }}>{showHistorial ? "▲" : "▼"}</span>
+            </div>
+            {showHistorial && (
+              <div style={{ marginTop: S.sm }}>
+                {historial.map(entry => (
+                  <div key={entry.id} onClick={() => setCode(entry.codigo.replace("...", ""))} style={{ border: `1px solid ${C.border}`, background: C.white, padding: `${S.md}px ${S.lg}px`, marginBottom: S.sm, cursor: "pointer" }}>
+                    <div style={{ ...label(), marginBottom: S.xs }}>{entry.fecha}</div>
+                    <div style={{ fontSize: T.sm, color: C.text, fontFamily: T.mono, marginBottom: S.xs }}>{entry.codigo}</div>
+                    <div style={{ fontSize: T.sm, color: C.burgundy, fontStyle: "italic" }}>{entry.resumen}</div>
+                  </div>
+                ))}
+                <button onClick={() => { setHistorial([]); setShowHistorial(false); }} style={{ ...btnGhost(), marginTop: S.xs }}>
+                  Borrar historial
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* FOOTER TEXT */}
+        <div style={{ textAlign: "center", marginTop: S.xxxl, ...label(), color: C.border, letterSpacing: T.widest }}>
           ✦ Python en español · Sin registro · Sin costo · La cuarta transformación del código ✦
         </div>
       </div>
 
       {/* BOTTOM STRIPE */}
-      <div style={{
-        height: 6,
-        background: `linear-gradient(90deg, ${C.olive} 0%, ${C.gold} 40%, ${C.burgundy} 100%)`,
-        marginTop: 40,
-      }} />
+      <div style={{ height: 6, background: `linear-gradient(90deg, ${C.olive}, ${C.gold} 40%, ${C.burgundy})`, marginTop: S.xxxl }} />
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&family=Noto+Sans:wght@300;400;600;700&family=Open+Sans:wght@300;400;600;700&display=swap');
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(6px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&family=Noto+Sans:wght@300;400;600;700&display=swap');
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
         * { box-sizing: border-box; }
-        body, div, span, p, button, textarea, li {
-          font-family: "Noto Sans", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
-          font-weight: 300;
-          line-height: 1.42857;
-        }
-        h1 { font-family: 'Montserrat', sans-serif !important; font-weight: 900 !important; }
-        textarea::placeholder { color: ${C.border}; }
+        textarea::placeholder { color: ${C.border}; font-family: ${T.mono}; }
         button:hover:not(:disabled) { opacity: 0.88; }
       `}</style>
     </div>
