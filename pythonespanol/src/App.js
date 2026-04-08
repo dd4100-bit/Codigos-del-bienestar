@@ -244,12 +244,34 @@ function AMLOCartoon() {
 }
 
 // ============================================
-// FORMAT RESPONSE — consistent typography
+// FORMAT RESPONSE — terminal style
 // ============================================
 function formatResponse(text) {
   const lines = text.split("\n");
+  let inCodeBlock = false;
+
   return lines.map((line, i) => {
-    // Opening AMLO line — big, burgundy, memorable
+    // Toggle code block
+    if (line.includes("```")) {
+      inCodeBlock = !inCodeBlock;
+      return null;
+    }
+
+    // Inside code block — pure terminal
+    if (inCodeBlock) {
+      const isComment = line.trim().startsWith("#") || line.trim().startsWith("//") || line.trim().startsWith("--");
+      return (
+        <div key={i} style={{
+          fontFamily: T.mono,
+          fontSize: T.base,
+          lineHeight: 1.7,
+          color: isComment ? "#6A9955" : "#D4D4D4",
+          whiteSpace: "pre",
+        }}>{line || " "}</div>
+      );
+    }
+
+    // AMLO opening line — bold, burgundy, big
     if (line.startsWith("🎤")) {
       return (
         <div key={i} style={{
@@ -264,74 +286,49 @@ function formatResponse(text) {
         }}>{line.replace("🎤", "").trim()}</div>
       );
     }
-    // Section labels — clean, small
-    if (line === "El problema:" || line === "✅ Así se hace:" || line === "💡") {
+
+    // Section labels
+    if (line.startsWith("El problema:") || line.startsWith("✅ Así se hace:")) {
       return (
         <div key={i} style={{
           fontSize: T.xs,
           fontWeight: T.bold,
           color: C.textLight,
-          fontFamily: T.sans,
+          fontFamily: T.mono,
           letterSpacing: T.widest,
           textTransform: "uppercase",
           marginTop: S.lg,
           marginBottom: S.xs,
-        }}>{line.replace("✅", "").replace("💡", "").trim()}</div>
+        }}>{line.replace("✅", "").trim()}</div>
       );
     }
-    // Tip line starting with 💡
+
+    // Tip line
     if (line.startsWith("💡")) {
       return (
         <div key={i} style={{
           fontSize: T.sm,
           color: C.textLight,
-          fontFamily: T.sans,
-          fontWeight: T.light,
-          fontStyle: "italic",
+          fontFamily: T.mono,
           marginTop: S.lg,
           paddingTop: S.lg,
           borderTop: `1px solid ${C.border}`,
-        }}>{line.replace("💡", "").trim()}</div>
+        }}>{line.replace("💡", "► ").trim()}</div>
       );
     }
-    if (line.includes("```")) return null;
-    // Code comments
-    if (line.trim().startsWith("#")) {
-      return (
-        <div key={i} style={{
-          color: C.textLight,
-          fontFamily: T.mono,
-          fontSize: T.sm,
-          lineHeight: 1.7,
-        }}>{line}</div>
-      );
-    }
-    // Code lines
-    const isCode = line.match(/^\s*(print|def|for|if|else|return|import|class|while|resultado|edad|lista|dinero)/) ||
-                   line.match(/^(print|def|for|if|else|return|import|class|while)/);
-    if (isCode) {
-      return (
-        <div key={i} style={{
-          color: C.text,
-          fontFamily: T.mono,
-          fontSize: T.base,
-          lineHeight: 1.8,
-          background: C.creamDark,
-          padding: `1px ${S.sm}px`,
-          borderLeft: `2px solid ${C.gold}`,
-        }}>{line}</div>
-      );
-    }
-    // Regular text
+
+    // Empty line
+    if (line.trim() === "") return <div key={i} style={{ height: S.sm }} />;
+
+    // Regular explanation text — monospace, terminal feel
     return (
       <div key={i} style={{
-        color: C.textMid,
-        marginBottom: line.trim() === "" ? S.sm : 1,
-        lineHeight: 1.8,
+        color: "#CCCCCC",
+        fontFamily: T.mono,
         fontSize: T.base,
-        fontFamily: T.sans,
+        lineHeight: 1.8,
         fontWeight: T.light,
-      }}>{line || "\u00A0"}</div>
+      }}>{line}</div>
     );
   });
 }
@@ -617,7 +614,7 @@ export default function App() {
                 {copied ? "✓ Copiado" : "Copiar"}
               </button>
             </div>
-            <div style={{ padding: S.xxl, background: C.white }}>
+            <div style={{ padding: S.xxl, background: "#1E1E1E", fontFamily: T.mono }}>
               {formatResponse(response)}
             </div>
             <div style={{ borderTop: `1px solid ${C.border}`, padding: `${S.md}px ${S.xl}px`, display: "flex", justifyContent: "space-between", alignItems: "center", background: C.creamDark }}>
