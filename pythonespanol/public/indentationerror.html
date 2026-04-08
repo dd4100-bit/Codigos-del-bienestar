@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>IndentationError en Python — Qué significa y cómo arreglarlo en español</title>
+  <meta name="description" content="¿Tienes un IndentationError en Python? Te explicamos en español qué significa la sangría, por qué pasa y cómo arreglarlo."/>
+  <meta name="keywords" content="indentationerror python, indentation error python español, error sangria python, como arreglar indentationerror python"/>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Noto+Sans:wght@300;400;600&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:"Noto Sans",sans-serif;font-weight:300;background:#F5F0E8;color:#1A1008;line-height:1.7;}
+    .top-stripe{height:5px;background:linear-gradient(90deg,#6B1223,#C8971F,#3A5A2A);}
+    .navbar{background:#6B1223;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;}
+    .navbar a{color:#C8971F;text-decoration:none;font-family:"Montserrat",sans-serif;font-weight:700;font-size:16px;}
+    h1{font-family:"Montserrat",sans-serif;font-weight:900;font-size:clamp(2rem,5vw,3.2rem);color:#6B1223;line-height:1.1;margin-bottom:16px;}
+    .hero{max-width:860px;margin:0 auto;padding:48px 24px 32px;}
+    .card{background:#fff;border:1px solid #C8A882;padding:24px;margin-bottom:16px;}
+    .code-block{background:#1A1008;color:#C8971F;padding:16px;font-family:"Courier New",monospace;font-size:13px;line-height:1.7;margin:12px 0;}
+    .profesor-section{background:#6B1223;padding:40px 24px;text-align:center;}
+    .profesor-section h2{color:#C8971F;font-family:"Montserrat",sans-serif;font-size:24px;margin-bottom:16px;}
+    .profesor-btn{display:inline-block;background:#C8971F;color:#6B1223;font-family:"Montserrat",sans-serif;font-weight:700;font-size:14px;padding:14px 32px;text-decoration:none;}
+    footer{background:#1A1008;padding:20px 24px;text-align:center;color:#4A3020;font-size:11px;}
+    footer a{color:#4A3020;text-decoration:none;}
+  </style>
+</head>
+<body>
+<div class="top-stripe"></div>
+<div class="navbar">
+  <a href="https://pythonespanol.com">🐍 pythonespanol.com</a>
+</div>
+<div class="hero">
+  <h1>IndentationError en Python</h1>
+  <p>La sangría no se le olvide mijo. Te explicamos en español qué es y cómo arreglarlo.</p>
+</div>
+<div style="max-width:860px;margin:0 auto;padding:0 24px 48px;">
+  <div class="card">
+    <h2 style="color:#6B1223;font-family:Montserrat;margin-bottom:12px;">¿Qué es un IndentationError?</h2>
+    <p>Python usa espacios para saber qué código va dentro de qué. Si los espacios no están bien puestos, Python no puede leer tu código y te manda este error.</p>
+  </div>
+  <div class="card">
+    <p style="color:#8A7060;margin-bottom:8px;">❌ Error:</p>
+    <div class="code-block">def saludar():
+print("Buenos dias")
+# IndentationError: expected an indented block</div>
+    <p style="color:#8A7060;margin:8px 0;">✅ Correcto:</p>
+    <div class="code-block">def saludar():
+    print("Buenos dias")
+# 4 espacios antes del print</div>
+  </div>
+  <div class="card">
+    <h2 style="color:#6B1223;font-family:Montserrat;margin-bottom:12px;">La regla de oro</h2>
+    <p>Todo lo que va dentro de una función, if, for o while necesita 4 espacios al inicio. Siempre. Sin excepción. Indentation le llamamos los que sí sabemos inglés.</p>
+  </div>
+</div>
+<div class="profesor-section">
+  <h2>¿Sigues con el er
