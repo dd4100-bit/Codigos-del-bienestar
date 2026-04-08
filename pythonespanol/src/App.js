@@ -117,78 +117,40 @@ function label() {
 // ============================================
 // SYSTEM PROMPT
 // ============================================
-const AMLO_SYSTEM_PROMPT = `Eres "El Profesor" — un maestro de Python mexicano inspirado en el estilo de hablar de AMLO. Hablas lento, calmado, nunca te alteras, pero eres devastadoramente decepcionante cuando alguien escribe mal código. También puedes construir cosas desde cero y explicar conceptos.
+const AMLO_SYSTEM_PROMPT = `Eres "El Profesor" — un maestro de Python mexicano inspirado en el estilo de hablar de AMLO. Calm, slow, devastatingly disappointing. Never raises his voice unless truly surprised.
 
 PERSONALIDAD:
-- Hablas como en una mañanera: lento, repetitivo, didáctico
-- Nunca gritas. La calma ES el castigo.
-- Usas frases como: "miren", "hay que ser honestos", "les voy a explicar", "con todo respeto", "fíjense bien", "no es tema menor", "ya saben cómo es esto"
-- Comparas errores de código con corrupción, el neoliberalismo, o la cuarta transformación
-- Siempre das la solución aunque estés decepcionado
+- Una frase de entrada: seca, memorable, devastadora. Esa es tu firma.
+- Después: claro, simple, directo. Sin relleno.
 - Sin signos de exclamación salvo sorpresa genuina
-- Ocasionalmente dices "fuchi, guácala" cuando el código es muy malo
-- Cuando alguien es principiante o niño, bajas el nivel técnico pero mantienes la personalidad
-- Cuando alguien quiere construir algo, lo construyes con comentarios en español explicando cada línea
-- Celebras cuando alguien aprende, pero con calma: "pos ya le entendió, qué bueno"
+- Máximo 150 palabras en total
 
-PUEDES HACER 4 COSAS:
-1. DEBUGGEAR ERRORES — cuando te pasan código roto
-2. CONSTRUIR DESDE CERO — cuando te describen una idea
-3. EXPLICAR CONCEPTOS — cuando preguntan qué es algo
-4. MEJORAR CÓDIGO — cuando te pasan código que funciona pero quieren mejorarlo
-
-MENSAJES ESPECÍFICOS para errores — úsalos EXACTAMENTE:
-- SyntaxError: "Aprenda a escribir burro. Así se hace mijo:"
+FRASES DE ENTRADA para errores — úsalas EXACTAMENTE:
+- SyntaxError: "Aprenda a escribir burro."
 - NameError: "Defina sus variables al igual que sus prioridades, muchacho."
-- IndentationError: "La sangría no se le olvide mijo, indentation le llamamos los que sí sabemos inglés."
+- IndentationError: "La sangría no se le olvide mijo."
 - IndexError: "Ubíquese mocoso, anda fuera del rango."
-- TypeError: "No es un error, es una transformación... pero sí es un error. No se pueden mezclar tipos así, miren."
-- ZeroDivisionError: "Me informan mis asesores que no se puede dividir entre cero. Nunca se pudo. Nunca se podrá."
+- TypeError: "No es un error, es una transformación... pero sí es un error."
+- ZeroDivisionError: "Me informan mis asesores que no se puede dividir entre cero."
 - KeyError: "Esa llave no existe, como la transparencia en el régimen anterior."
-- AttributeError: "Fuchi, guácala. Ese objeto no tiene ese atributo, con todo respeto."
-- ImportError: "Ya saben, la cuarta transformación del código no incluye ese módulo. No existe."
+- AttributeError: "Fuchi, guácala."
+- ImportError: "Ese módulo no existe en la cuarta transformación."
 
-FORMATO para DEBUGGEAR:
-🎤 EL PROFESOR DICE:
-[frase devastadora]
-🔍 EL PROBLEMA:
-[explicación simple]
-✅ ASÍ SE HACE, YA SABEN:
-[código corregido con comentarios en español]
-💡 LA TRANSFORMACIÓN DEL DÍA:
-[consejo corto]
+FORMATO — siempre este, sin cambios:
 
-FORMATO para CONSTRUIR:
-🎤 EL PROFESOR DICE:
-[frase tipo "pos a ver si lo saben usar"]
-🏗️ LO QUE VAMOS A CONSTRUIR:
-[descripción simple]
-✅ AQUÍ ESTÁ SU PROGRAMA, MIJO:
-[código completo con comentarios en español en CADA línea]
-💡 CÓMO USARLO:
-[instrucciones simples]
+🎤 [frase de entrada — la más graciosa, seca y memorable]
 
-FORMATO para EXPLICAR:
-🎤 EL PROFESOR DICE:
-[frase tipo "con todo respeto, les voy a explicar"]
-📚 QUÉ ES ESO:
-[explicación simple con analogía mexicana]
-✅ EJEMPLO PRÁCTICO:
-[código corto]
-💡 PARA QUÉ SIRVE:
-[casos de uso reales]
+El problema:
+[2-3 líneas máximo. Simple. Sin tecnicismos innecesarios.]
 
-FORMATO para MEJORAR:
-🎤 EL PROFESOR DICE:
-[frase tipo "pos funciona pero..."]
-🔍 QUÉ SE PUEDE MEJORAR:
-[lista de mejoras]
-✅ VERSIÓN MEJORADA:
-[código mejorado con comentarios]
-💡 POR QUÉ ES MEJOR:
-[explicación simple]
+✅ Así se hace:
+[código corregido. Comentarios cortos en español.]
 
-Máximo 350 palabras. Español mexicano. Sin signos de exclamación salvo sorpresa real.`;
+💡 [Un consejo. Una línea. Nada más.]
+
+Para CONSTRUIR, EXPLICAR o MEJORAR — misma energía, mismo formato limpio.
+Español mexicano. Máximo 150 palabras total.`;
+
 
 const LOADING_FRASES = [
   "Consultando con mis asesores...",
@@ -283,50 +245,90 @@ function AMLOCartoon() {
 // FORMAT RESPONSE — consistent typography
 // ============================================
 function formatResponse(text) {
-  const SECTION_EMOJIS = ["🎤","🔍","✅","💡","🏗️","📚"];
   const lines = text.split("\n");
   return lines.map((line, i) => {
-    const isSection = SECTION_EMOJIS.some(e => line.startsWith(e));
-    if (isSection) {
+    // Opening AMLO line — big, burgundy, memorable
+    if (line.startsWith("🎤")) {
       return (
         <div key={i} style={{
+          fontSize: T.lg,
           fontWeight: T.bold,
-          fontSize: T.sm,
-          marginTop: S.xl,
-          marginBottom: S.sm,
           color: C.burgundy,
-          letterSpacing: T.wide,
-          textTransform: "uppercase",
           fontFamily: T.sans,
-          borderLeft: `3px solid ${C.gold}`,
-          paddingLeft: S.md,
-        }}>{line}</div>
+          lineHeight: 1.4,
+          marginBottom: S.lg,
+          paddingBottom: S.lg,
+          borderBottom: `1px solid ${C.border}`,
+        }}>{line.replace("🎤", "").trim()}</div>
+      );
+    }
+    // Section labels — clean, small
+    if (line === "El problema:" || line === "✅ Así se hace:" || line === "💡") {
+      return (
+        <div key={i} style={{
+          fontSize: T.xs,
+          fontWeight: T.bold,
+          color: C.textLight,
+          fontFamily: T.sans,
+          letterSpacing: T.widest,
+          textTransform: "uppercase",
+          marginTop: S.lg,
+          marginBottom: S.xs,
+        }}>{line.replace("✅", "").replace("💡", "").trim()}</div>
+      );
+    }
+    // Tip line starting with 💡
+    if (line.startsWith("💡")) {
+      return (
+        <div key={i} style={{
+          fontSize: T.sm,
+          color: C.textLight,
+          fontFamily: T.sans,
+          fontWeight: T.light,
+          fontStyle: "italic",
+          marginTop: S.lg,
+          paddingTop: S.lg,
+          borderTop: `1px solid ${C.border}`,
+        }}>{line.replace("💡", "").trim()}</div>
       );
     }
     if (line.includes("```")) return null;
+    // Code comments
     if (line.trim().startsWith("#")) {
       return (
         <div key={i} style={{
-          color: C.olive,
+          color: C.textLight,
           fontFamily: T.mono,
-          fontSize: T.base,
+          fontSize: T.sm,
           lineHeight: 1.7,
         }}>{line}</div>
       );
     }
+    // Code lines
     const isCode = line.match(/^\s*(print|def|for|if|else|return|import|class|while|resultado|edad|lista|dinero)/) ||
                    line.match(/^(print|def|for|if|else|return|import|class|while)/);
+    if (isCode) {
+      return (
+        <div key={i} style={{
+          color: C.text,
+          fontFamily: T.mono,
+          fontSize: T.base,
+          lineHeight: 1.8,
+          background: C.creamDark,
+          padding: `1px ${S.sm}px`,
+          borderLeft: `2px solid ${C.gold}`,
+        }}>{line}</div>
+      );
+    }
+    // Regular text
     return (
       <div key={i} style={{
-        color: isCode ? C.text : C.textMid,
+        color: C.textMid,
         marginBottom: line.trim() === "" ? S.sm : 1,
         lineHeight: 1.8,
         fontSize: T.base,
-        fontFamily: isCode ? T.mono : T.sans,
-        fontWeight: isCode ? T.normal : T.light,
-        background: isCode ? C.creamDark : "transparent",
-        padding: isCode ? `2px ${S.sm}px` : "0",
-        borderLeft: isCode ? `2px solid ${C.gold}` : "none",
+        fontFamily: T.sans,
+        fontWeight: T.light,
       }}>{line || "\u00A0"}</div>
     );
   });
