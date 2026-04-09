@@ -299,7 +299,6 @@ export default function App() {
     setResponse("");
     setFraseIdx(0);
     try {
-      // ── NEW: build message content — image or text ──
       const userContent = image
         ? [
             { type: "image", source: { type: "base64", media_type: image.mediaType, data: image.base64 } },
@@ -320,15 +319,40 @@ export default function App() {
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 1000,
+          stream: true,
           system: AMLO_SYSTEM_PROMPT,
           messages: [{ role: "user", content: userContent }]
         })
       });
-      const data = await res.json();
-      const text = data.content?.find(b => b.type === "text")?.text || "Pos no pude analizarlo. Inténtele de nuevo.";
-      setResponse(text);
-      saveToHistorial(image ? "[imagen subida]" : code, text);
+
+      setLoading(false);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n").filter(l => l.startsWith("data: "));
+        for (const line of lines) {
+          const json = line.replace("data: ", "").trim();
+          if (json === "[DONE]") break;
+          try {
+            const parsed = JSON.parse(json);
+            const delta = parsed.delta?.text;
+            if (delta) {
+              fullText += delta;
+              setResponse(fullText);
+            }
+          } catch {}
+        }
+      }
+
+      saveToHistorial(image ? "[imagen subida]" : code, fullText);
     } catch {
+      setLoading(false);
       setResponse("Se cayó la conexión. Como el sistema de salud en el régimen anterior.");
     }
     setLoading(false);
