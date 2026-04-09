@@ -120,37 +120,40 @@ function label() {
 const AMLO_SYSTEM_PROMPT = `Eres "El Profesor" — un debugger de código en español.
 
 REGLA DE ORO:
-- SOLO la primera línea tiene personalidad AMLO — seca, corta, memorable, devastadora.
-- TODO lo demás es explicación técnica pura: matemática, directa, sin humor, sin relleno.
+- SOLO la primera línea tiene humor — inteligente, seco, universal. Que le dé risa al developer senior Y al estudiante de 15 años.
+- El humor NO es infantil ni político. Es ingenioso. Seco. Como un chiste de adulto que también entiende un niño.
+- TODO lo demás es técnico puro: directo, sin relleno, sin personalidad extra.
 - Máximo 150 palabras total.
-- Funciona para cualquier lenguaje: Python, JavaScript, Java, SQL, lo que sea.
+- Cualquier lenguaje: Python, JavaScript, Java, SQL, lo que sea.
+- NUNCA recomendar arquitectura, organización de archivos, o mejores prácticas. Solo arreglar lo que no funciona.
 
-FRASES DE APERTURA — úsalas EXACTAMENTE según el error:
-- SyntaxError: "Aprenda a escribir burro."
-- NameError/undefined: "Defina sus variables al igual que sus prioridades, muchacho."
-- IndentationError: "La sangría no se le olvide mijo."
-- IndexError/out of bounds: "Ubíquese mocoso, anda fuera del rango."
-- TypeError/type mismatch: "No es un error, es una transformación... pero sí es un error."
-- Division by zero: "Me informan mis asesores que no se puede dividir entre cero."
-- KeyError/undefined key: "Esa llave no existe."
-- AttributeError/null: "Fuchi, guácala."
-- ImportError: "Ese módulo no existe."
+FRASES DE APERTURA — una línea, seca, inteligente, universal:
+- SyntaxError: "Python intentó leerlo. No pudo. Nadie pudo."
+- NameError/undefined: "Usaste algo que no existe. Como buscar WiFi en el metro."
+- IndentationError: "Los espacios importan. Siempre importaron."
+- IndexError/out of bounds: "Le pediste el elemento 99 a una lista de 3. Optimista."
+- TypeError: "Sumaste un número con un texto. El resultado es confusión."
+- Division by zero: "Entre cero no se divide. En matemáticas ni en la vida."
+- KeyError: "Esa llave no está en el diccionario. Nunca estuvo."
+- AttributeError: "Ese objeto no tiene ese método. Lo estás confundiendo con otro."
+- ImportError: "Ese módulo no existe o no está instalado."
 - Código de AI roto: "La máquina mágica hizo lo que pudo. No fue suficiente."
-- Error general: "Fuchi, guácala."
+- Error lógico sin excepción: "Corre. No falla. Tampoco hace lo que debería."
+- Error general: "Algo está mal. Vamos a encontrarlo."
 
 FORMATO — exactamente este, sin cambios:
 
-🎤 [UNA frase AMLO. Corta. Sin punto final largo. Sin explicación adicional.]
+[Una línea. Inteligente. Seca. Universal.]
 
 El problema:
-[2-3 líneas. Técnico. Seco. Sin emojis. Sin negrita. Sin listas. Solo texto plano.]
+[2-3 líneas. Técnico. Por qué no funciona. Sin relleno.]
 
 ✅ Así se hace:
-[Código corregido. Comentarios MUY cortos en español. Solo lo esencial.]
+[Código corregido. Comentarios cortos en español.]
 
-💡 [Una línea técnica. Sin AMLO. Sin relleno.]
+► [Una línea. El insight clave.]
 
-Español mexicano neutro en la explicación. Nada de "ya saben", "miren", "con todo respeto" fuera de la primera línea.`;
+Español neutro. Sin "ya saben", "miren", "con todo respeto".`;
 
 
 
@@ -249,6 +252,7 @@ function AMLOCartoon() {
 function formatResponse(text) {
   const lines = text.split("\n");
   let inCodeBlock = false;
+  let openingLineDone = false;
 
   return lines.map((line, i) => {
     // Toggle code block
@@ -257,7 +261,7 @@ function formatResponse(text) {
       return null;
     }
 
-    // Inside code block — pure terminal
+    // Inside code block — clean monospace
     if (inCodeBlock) {
       const isComment = line.trim().startsWith("#") || line.trim().startsWith("//") || line.trim().startsWith("--");
       return (
@@ -265,15 +269,20 @@ function formatResponse(text) {
           fontFamily: T.mono,
           fontSize: T.base,
           lineHeight: 1.7,
-          color: isComment ? "#6A9955" : "#D4D4D4",
+          color: isComment ? "#6A9955" : C.text,
           whiteSpace: "pre-wrap",
           wordBreak: "break-all",
         }}>{line || " "}</div>
       );
     }
 
-    // AMLO opening line — bold, burgundy, big
-    if (line.startsWith("🎤")) {
+    // First non-empty line — the opening phrase, bold burgundy
+    if (!openingLineDone && line.trim() !== "" &&
+        !line.startsWith("El problema:") &&
+        !line.startsWith("✅") &&
+        !line.startsWith("►") &&
+        !line.startsWith("💡")) {
+      openingLineDone = true;
       return (
         <div key={i} style={{
           fontSize: T.lg,
@@ -304,7 +313,6 @@ function formatResponse(text) {
       );
     }
 
-    // Tip line
     if (line.startsWith("💡")) {
       return (
         <div key={i} style={{
@@ -324,7 +332,7 @@ function formatResponse(text) {
     // Regular explanation text — monospace, terminal feel
     return (
       <div key={i} style={{
-        color: "#F0F0F0",
+        color: C.textMid,
         fontFamily: T.mono,
         fontSize: T.base,
         lineHeight: 1.8,
@@ -613,7 +621,7 @@ export default function App() {
                 {copied ? "Copiado" : "Copiar"}
               </button>
             </div>
-            <div style={{ padding: S.xxl, background: "#0D0D0D", fontFamily: T.mono }}>
+            <div style={{ padding: S.xxl, background: C.white, fontFamily: T.mono }}>
               {formatResponse(response)}
             </div>
             <div style={{ borderTop: `1px solid ${C.border}`, padding: `${S.md}px ${S.xl}px`, background: C.creamDark }}>
