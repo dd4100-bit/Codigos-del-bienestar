@@ -520,12 +520,33 @@ export default function App() {
                 const file = e.dataTransfer.files[0];
                 if (!file || !file.type.startsWith("image/")) return;
                 const reader = new FileReader();
-                reader.onload = () => { setImage({ base64: reader.result.split(",")[1], mediaType: file.type, preview: reader.result }); setCode(""); };
+                reader.onload = () => { setImage({ base64: reader.result.split(",")[1], mediaType: file.type, preview: reader.result }); };
                 reader.readAsDataURL(file);
               }}
-              style={{ padding: S.lg, background: C.white, textAlign: "center", minHeight: 200, display: "flex", alignItems: "center", justifyContent: "center" }}
+              style={{ background: C.white }}
             >
-              <img src={image.preview} alt="Código subido" style={{ maxWidth: "100%", maxHeight: 300, border: `1px solid ${C.border}` }} />
+              <div style={{ padding: S.lg, textAlign: "center" }}>
+                <img src={image.preview} alt="Código subido" style={{ maxWidth: "100%", maxHeight: 300, border: `1px solid ${C.border}` }} />
+              </div>
+              <textarea
+                autoFocus
+                value={code}
+                onChange={e => {
+                  setCode(e.target.value);
+                  e.target.style.height = "auto";
+                  e.target.style.height = e.target.scrollHeight + "px";
+                }}
+                placeholder="Escribe contexto adicional aquí (opcional) — ej: línea 42 da error..."
+                onKeyDown={e => {
+                  if (e.key === "Tab") {
+                    e.preventDefault();
+                    const s = e.target.selectionStart;
+                    setCode(c => c.substring(0, s) + "    " + c.substring(e.target.selectionEnd));
+                    setTimeout(() => { e.target.selectionStart = e.target.selectionEnd = s + 4; }, 0);
+                  }
+                }}
+                style={{ width: "100%", minHeight: 48, padding: `${S.md}px ${S.lg}px`, background: C.creamDark, border: "none", borderTop: `1px solid ${C.border}`, outline: "none", color: C.textMid, fontSize: T.base, lineHeight: 1.8, fontFamily: T.mono, resize: "none", boxSizing: "border-box", overflow: "hidden" }}
+              />
             </div>
           ) : (
             <textarea
