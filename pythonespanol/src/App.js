@@ -266,7 +266,8 @@ function formatResponse(text) {
           fontSize: T.base,
           lineHeight: 1.7,
           color: isComment ? "#6A9955" : "#D4D4D4",
-          whiteSpace: "pre",
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-all",
         }}>{line || " "}</div>
       );
     }
@@ -328,6 +329,8 @@ function formatResponse(text) {
         fontSize: T.base,
         lineHeight: 1.8,
         fontWeight: T.light,
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
       }}>{line}</div>
     );
   });
