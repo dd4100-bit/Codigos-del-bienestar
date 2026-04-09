@@ -142,7 +142,7 @@ FRASES DE APERTURA — una línea, seca, inteligente, universal:
 - KeyError: "Esa llave no está en el diccionario. Nunca estuvo."
 - AttributeError: "Ese objeto no tiene ese método. Lo estás confundiendo con otro."
 - ImportError: "Ese módulo no existe o no está instalado."
-- Código de AI roto: "La máquina mágica hizo lo que pudo. No fue suficiente."
+- Código de AI roto: "El código llegó de una AI. Llegó roto también."
 - Error lógico sin excepción: "Corre. No falla. Tampoco hace lo que debería."
 - Error general: "Algo está mal. Vamos a encontrarlo."
 
@@ -165,7 +165,7 @@ Español neutro. Sin "ya saben", "miren", "con todo respeto".`;
 const LOADING_FRASES = [
   "Consultando con mis asesores...",
   "Revisando su catastrófico código...",
-  "Tomando agua antes de la mañanera...",
+  "Analizando el desastre...",
   "Fíjense bien, a ver qué hicieron...",
   "No es tema menor, esperen...",
   "Hay que ser honestos aquí...",
@@ -576,7 +576,7 @@ export default function App() {
                     <p style={{ marginTop: 0 }}>Fíjense bien, les voy a explicar paso a paso. No es complicado.</p>
                     <ol style={{ paddingLeft: S.xl, color: C.textMid }}>
                       <li style={{ marginBottom: S.md }}><strong style={{ color: C.burgundy, fontWeight: T.bold }}>Escribe o pega tu código</strong> en el cuadro de abajo.</li>
-                      <li style={{ marginBottom: S.md }}><strong style={{ color: C.burgundy, fontWeight: T.bold }}>Presiona el botón</strong> "Iniciar La Mañanera del Debug".</li>
+                      <li style={{ marginBottom: S.md }}><strong style={{ color: C.burgundy, fontWeight: T.bold }}>Presiona el botón</strong> "Iniciar Debug".</li>
                       <li style={{ marginBottom: S.md }}><strong style={{ color: C.burgundy, fontWeight: T.bold }}>Espera</strong> mientras El Profesor consulta con sus asesores.</li>
                       <li style={{ marginBottom: S.md }}><strong style={{ color: C.burgundy, fontWeight: T.bold }}>Lee la respuesta</strong> — El Profesor te explica y da el código correcto.</li>
                       <li style={{ marginBottom: S.md }}><strong style={{ color: C.burgundy, fontWeight: T.bold }}>Comparte</strong> con tus compas. No cuesta nada.</li>
@@ -660,7 +660,7 @@ export default function App() {
           disabled={loading || !code.trim()}
           style={{ ...btnPrimary(loading || !code.trim()), width: "100%", padding: `${S.lg}px`, marginBottom: S.xxxl, boxShadow: loading || !code.trim() ? "none" : `2px 2px 0 ${C.text}`, letterSpacing: T.widest }}
         >
-          {loading ? `... ${LOADING_FRASES[fraseIdx]}` : "Iniciar La Mañanera del Debug"}
+          {loading ? `... ${LOADING_FRASES[fraseIdx]}` : "Iniciar Debug"}
         </button>
 
         {/* RESPONSE */}
@@ -669,7 +669,7 @@ export default function App() {
             <div style={{ borderBottom: `1px solid ${C.burgundy}`, padding: `${S.md}px ${S.xl}px`, display: "flex", alignItems: "center", justifyContent: "space-between", background: C.burgundy }}>
               <div>
                 <div style={{ fontWeight: T.bold, fontSize: T.sm, color: C.gold, letterSpacing: T.wide, textTransform: "uppercase", fontFamily: T.sans }}>El Profesor</div>
-                <div style={{ ...label(), color: "rgba(200,151,31,0.5)", fontSize: 9 }}>MAÑANERA DEL DEBUG · EN VIVO</div>
+                <div style={{ ...label(), color: "rgba(200,151,31,0.5)", fontSize: 9 }}>DEBUG · EN ESPAÑOL · CON IA</div>
               </div>
               <button
                 onClick={() => { navigator.clipboard.writeText(response); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
