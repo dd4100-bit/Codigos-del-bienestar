@@ -247,7 +247,63 @@ function AMLOCartoon() {
 }
 
 // ============================================
-// FORMAT RESPONSE — terminal style
+// SYNTAX HIGHLIGHTER
+// ============================================
+function highlightCode(line) {
+  const keywords = /\b(def|return|if|elif|else|for|while|in|and|or|not|import|from|class|try|except|finally|with|as|pass|break|continue|lambda|yield|True|False|None|const|let|var|function|=>|async|await|SELECT|FROM|WHERE|ORDER|BY|GROUP|INSERT|UPDATE|DELETE|JOIN)\b/g;
+  const strings = /(["'`])(?:(?=(\\?))\2.)*?\1/g;
+  const numbers = /\b(\d+\.?\d*)\b/g;
+  const comments = /^(\s*)(#.*|\/\/.*)$/;
+
+  if (comments.test(line)) {
+    return <span style={{ color: "#6A9955" }}>{line}</span>;
+  }
+
+  // Simple token colorizer
+  const parts = [];
+  let remaining = line;
+  let key = 0;
+
+  // Split by spaces and color tokens
+  const tokens = line.split(/(\s+)/);
+  return (
+    <span>
+      {tokens.map((token, idx) => {
+        if (/^\s+$/.test(token)) return <span key={idx}>{token}</span>;
+        if (keywords.test(token)) return <span key={idx} style={{ color: "#569CD6" }}>{token}</span>;
+        if (/^["'`].*["'`]$/.test(token)) return <span key={idx} style={{ color: "#CE9178" }}>{token}</span>;
+        if (/^\d+\.?\d*$/.test(token)) return <span key={idx} style={{ color: "#B5CEA8" }}>{token}</span>;
+        if (/^#.*/.test(token)) return <span key={idx} style={{ color: "#6A9955" }}>{token}</span>;
+        if (/^\/\/.*/.test(token)) return <span key={idx} style={{ color: "#6A9955" }}>{token}</span>;
+        return <span key={idx} style={{ color: C.text }}>{token}</span>;
+      })}
+    </span>
+  );
+}
+
+// SVG Icons
+const IconBug = () => (
+  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ marginRight: 6, verticalAlign: "middle" }}>
+    <circle cx="8" cy="8" r="3" stroke={C.burgundy} strokeWidth="1.5"/>
+    <path d="M8 1v4M8 11v4M1 8h4M11 8h4M3 3l2.5 2.5M10.5 10.5L13 13M13 3l-2.5 2.5M5.5 10.5L3 13" stroke={C.burgundy} strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+);
+
+const IconCheck = () => (
+  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ marginRight: 6, verticalAlign: "middle" }}>
+    <circle cx="8" cy="8" r="7" stroke={C.olive} strokeWidth="1.5"/>
+    <path d="M4.5 8l2.5 2.5 4.5-4.5" stroke={C.olive} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+const IconTip = () => (
+  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ marginRight: 6, verticalAlign: "middle" }}>
+    <path d="M8 1l1.8 3.6L14 5.6l-3 2.9.7 4.1L8 10.6l-3.7 2 .7-4.1-3-2.9 4.2-.8z" stroke={C.gold} strokeWidth="1.5" strokeLinejoin="round"/>
+  </svg>
+);
+
+// ============================================
+// FORMAT RESPONSE
 // ============================================
 function formatResponse(text) {
   const lines = text.split("\n");
@@ -261,22 +317,22 @@ function formatResponse(text) {
       return null;
     }
 
-    // Inside code block — clean monospace
+    // Inside code block — syntax highlighted
     if (inCodeBlock) {
-      const isComment = line.trim().startsWith("#") || line.trim().startsWith("//") || line.trim().startsWith("--");
       return (
         <div key={i} style={{
           fontFamily: T.mono,
           fontSize: T.base,
-          lineHeight: 1.7,
-          color: isComment ? "#6A9955" : C.text,
+          lineHeight: 1.8,
           whiteSpace: "pre-wrap",
           wordBreak: "break-all",
-        }}>{line || " "}</div>
+          background: C.creamDark,
+          padding: `1px ${S.sm}px`,
+        }}>{highlightCode(line)}</div>
       );
     }
 
-    // First non-empty line — the opening phrase, bold burgundy
+    // First non-empty line — opening phrase, bold burgundy
     if (!openingLineDone && line.trim() !== "" &&
         !line.startsWith("El problema:") &&
         !line.startsWith("✅") &&
@@ -297,39 +353,35 @@ function formatResponse(text) {
       );
     }
 
-    // Section labels
-    if (line.startsWith("El problema:") || line.startsWith("✅ Así se hace:")) {
+    // Section labels with icons
+    if (line.startsWith("El problema:")) {
       return (
-        <div key={i} style={{
-          fontSize: T.xs,
-          fontWeight: T.bold,
-          color: C.textLight,
-          fontFamily: T.mono,
-          letterSpacing: T.widest,
-          textTransform: "uppercase",
-          marginTop: S.lg,
-          marginBottom: S.xs,
-        }}>{line.replace("✅", "").trim()}</div>
+        <div key={i} style={{ display: "flex", alignItems: "center", fontSize: T.xs, fontWeight: T.bold, color: C.burgundy, fontFamily: T.mono, letterSpacing: T.widest, textTransform: "uppercase", marginTop: S.lg, marginBottom: S.xs }}>
+          <IconBug />EL PROBLEMA
+        </div>
       );
     }
 
-    if (line.startsWith("💡")) {
+    if (line.startsWith("✅ Así se hace:") || line.startsWith("Así se hace:")) {
       return (
-        <div key={i} style={{
-          fontSize: T.sm,
-          color: C.textLight,
-          fontFamily: T.mono,
-          marginTop: S.lg,
-          paddingTop: S.lg,
-          borderTop: `1px solid ${C.border}`,
-        }}>{line.replace("💡", "► ").trim()}</div>
+        <div key={i} style={{ display: "flex", alignItems: "center", fontSize: T.xs, fontWeight: T.bold, color: C.olive, fontFamily: T.mono, letterSpacing: T.widest, textTransform: "uppercase", marginTop: S.lg, marginBottom: S.xs }}>
+          <IconCheck />ASÍ SE HACE
+        </div>
+      );
+    }
+
+    if (line.startsWith("💡") || line.startsWith("►")) {
+      return (
+        <div key={i} style={{ display: "flex", alignItems: "center", fontSize: T.sm, color: C.gold, fontFamily: T.mono, marginTop: S.lg, paddingTop: S.lg, borderTop: `1px solid ${C.border}` }}>
+          <IconTip />{line.replace("💡", "").replace("►", "").trim()}
+        </div>
       );
     }
 
     // Empty line
     if (line.trim() === "") return <div key={i} style={{ height: S.sm }} />;
 
-    // Regular explanation text — monospace, terminal feel
+    // Regular explanation text
     return (
       <div key={i} style={{
         color: C.textMid,
