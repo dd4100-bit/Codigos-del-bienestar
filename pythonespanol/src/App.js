@@ -245,8 +245,8 @@ export default function App() {
   const [historial, setHistorial] = useState([]);
   const [showHistorial, setShowHistorial] = useState(false);
 
-  // ── NEW: image upload state ──
-  const [image, setImage] = useState(null); // { base64, mediaType, preview }
+  // images: array of { base64, mediaType, preview }
+  const [images, setImages] = useState([]);
   const fileInputRef = useRef(null);
 
   const responseRef = useRef(null);
@@ -280,29 +280,39 @@ export default function App() {
     setHistorial(prev => [entry, ...prev].slice(0, 10));
   }
 
-  // ── NEW: process uploaded image ──
+  function readImageFile(file) {
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({ base64: reader.result.split(",")[1], mediaType: file.type, preview: reader.result });
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function addImages(files) {
+    const valid = Array.from(files).filter(f => f.type.startsWith("image/"));
+    if (!valid.length) return;
+    const newImgs = await Promise.all(valid.map(readImageFile));
+    setImages(prev => [...prev, ...newImgs].slice(0, 20));
+  }
+
   function handleImageUpload(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result.split(",")[1];
-      setImage({ base64, mediaType: file.type, preview: reader.result });
-      setCode(""); // clear text when switching to image mode
-    };
-    reader.readAsDataURL(file);
+    addImages(e.target.files);
+  }
+
+  function removeImage(idx) {
+    setImages(prev => prev.filter((_, i) => i !== idx));
   }
 
   async function askProfe() {
-    if (!code.trim() && !image) return;
+    if (!code.trim() && !images.length) return;
     setLoading(true);
     setResponse("");
     setFraseIdx(0);
     try {
-      const userContent = image
+      const userContent = images.length
         ? [
-            { type: "image", source: { type: "base64", media_type: image.mediaType, data: image.base64 } },
-            { type: "text", text: `Analiza el código que aparece en esta imagen.${intention.trim() ? `\n\nResultado esperado: ${intention.trim()}` : ""}` }
+            ...images.map(img => ({ type: "image", source: { type: "base64", media_type: img.mediaType, data: img.base64 } })),
+            { type: "text", text: `Analiza el código que aparece en ${images.length > 1 ? "estas imágenes" : "esta imagen"}.${code.trim() ? `\n\nContexto adicional: ${code.trim()}` : ""}${intention.trim() ? `\n\nResultado esperado: ${intention.trim()}` : ""}` }
           ]
         : [
             { type: "text", text: `Analiza este código:\n\`\`\`\n${code}\n\`\`\`${intention.trim() ? `\n\nResultado esperado: ${intention.trim()}` : ""}` }
@@ -350,7 +360,7 @@ export default function App() {
         }
       }
 
-      saveToHistorial(image ? "[imagen subida]" : code, fullText);
+      saveToHistorial(images.length ? `[${images.length} imagen(es) subida(s)]` : code, fullText);
     } catch {
       setLoading(false);
       setResponse("Se cayó la conexión. Como el sistema de salud en el régimen anterior.");
@@ -358,7 +368,7 @@ export default function App() {
     setLoading(false);
   }
 
-  const isDisabled = loading || (!code.trim() && !image);
+  const isDisabled = loading || (!code.trim() && !images.length);
 
   return (
     <div style={{ minHeight: "100vh", background: C.cream, color: C.text, fontFamily: T.sans, fontWeight: T.light, padding: "0 0 80px 0" }}>
@@ -471,7 +481,7 @@ export default function App() {
 
         <div style={{ marginBottom: S.xxl, display: "flex", gap: S.sm, flexWrap: "wrap" }}>
           {EJEMPLOS.map(ej => (
-            <button key={ej.label} onClick={() => { setCode(ej.code); setImage(null); }} style={{
+            <button key={ej.label} onClick={() => { setCode(ej.code); setImages([]); }} style={{
               padding: `${S.xs}px ${S.md}px`,
               border: `1px solid ${code === ej.code ? C.burgundy : C.border}`,
               background: code === ej.code ? C.burgundy : C.creamDark,
@@ -497,27 +507,27 @@ export default function App() {
           {/* Header bar with 📷 button */}
           <div style={{ borderBottom: `1px solid ${C.burgundy}`, padding: `${S.sm}px ${S.lg}px`, display: "flex", justifyContent: "space-between", alignItems: "center", background: C.burgundy }}>
             <span style={{ ...label(), color: C.gold, fontSize: T.xs, letterSpacing: T.wider }}>
-              {image ? "foto_de_codigo.img" : "codigo_sospechoso.py"}
+              {images.length ? `${images.length} foto(s) cargada(s)` : "codigo_sospechoso.py"}
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: S.sm }}>
-              {image && (
+              {images.length > 0 && (
                 <button
-                  onClick={() => setImage(null)}
+                  onClick={() => setImages([])}
                   style={{ background: "none", border: `1px solid rgba(200,151,31,0.5)`, color: C.gold, fontSize: T.xs, padding: `2px ${S.sm}px`, cursor: "pointer", fontFamily: T.sans, letterSpacing: T.wide, textTransform: "uppercase" }}
                 >
-                  ✕ Quitar
+                  ✕ Quitar todo
                 </button>
               )}
               {/* ── 📷 UPLOAD BUTTON — place this in your repo at src/App.js ── */}
               <button
                 onClick={() => fileInputRef.current.click()}
                 style={{
-                  background: image ? C.gold : "none",
-                  border: `1px solid ${image ? C.gold : "rgba(200,151,31,0.5)"}`,
-                  color: image ? C.burgundy : C.gold,
+                  background: images.length ? C.gold : "none",
+                  border: `1px solid ${images.length ? C.gold : "rgba(200,151,31,0.5)"}`,
+                  color: images.length ? C.burgundy : C.gold,
                   fontSize: T.xs, padding: `2px ${S.sm}px`, cursor: "pointer",
                   fontFamily: T.sans, letterSpacing: T.wide, textTransform: "uppercase",
-                  fontWeight: image ? T.bold : T.normal,
+                  fontWeight: images.length ? T.bold : T.normal,
                 }}
               >
                 📷 Foto
@@ -530,28 +540,37 @@ export default function App() {
                 style={{ display: "none" }}
               />
               <span style={{ ...label(), color: "rgba(200,151,31,0.4)", fontSize: T.xs }}>
-                {image ? "foto lista" : code.length > 0 ? `${code.length} chars` : "vacío"}
+                {images.length ? `${images.length}/20 fotos` : code.length > 0 ? `${code.length} chars` : "vacío"}
               </span>
             </div>
           </div>
 
-          {/* Body: image preview OR textarea — both support drag & drop */}
-          {image ? (
+          {/* Body: image grid OR textarea — both support drag & drop */}
+          {images.length > 0 ? (
             <div
               onDragOver={e => e.preventDefault()}
-              onDrop={e => {
-                e.preventDefault();
-                const file = e.dataTransfer.files[0];
-                if (!file || !file.type.startsWith("image/")) return;
-                const reader = new FileReader();
-                reader.onload = () => { setImage({ base64: reader.result.split(",")[1], mediaType: file.type, preview: reader.result }); };
-                reader.readAsDataURL(file);
-              }}
+              onDrop={e => { e.preventDefault(); addImages(e.dataTransfer.files); }}
               style={{ background: C.white }}
             >
-              <div style={{ padding: S.lg, textAlign: "center" }}>
-                <img src={image.preview} alt="Código subido" style={{ maxWidth: "100%", maxHeight: 300, border: `1px solid ${C.border}` }} />
+              {/* Image grid */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: S.sm, padding: S.lg }}>
+                {images.map((img, idx) => (
+                  <div key={idx} style={{ position: "relative", display: "inline-block" }}>
+                    <img src={img.preview} alt={`foto ${idx + 1}`} style={{ maxHeight: 160, maxWidth: 200, border: `1px solid ${C.border}`, display: "block" }} />
+                    <button
+                      onClick={() => removeImage(idx)}
+                      style={{ position: "absolute", top: 4, right: 4, background: C.burgundy, border: "none", color: C.gold, width: 20, height: 20, cursor: "pointer", fontSize: 11, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}
+                    >✕</button>
+                  </div>
+                ))}
+                {images.length < 20 && (
+                  <div
+                    onClick={() => fileInputRef.current.click()}
+                    style={{ width: 80, height: 80, border: `1px dashed ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: C.textLight, fontSize: T.lg }}
+                  >+</div>
+                )}
               </div>
+              {/* Context textarea */}
               <textarea
                 autoFocus
                 value={code}
@@ -578,14 +597,7 @@ export default function App() {
               onChange={e => setCode(e.target.value)}
               placeholder={"# Pega tu código aquí — tuyo o de ChatGPT/Copilot\n# El Profesor lo arregla sin juzgarte (mucho)\n# O arrastra una foto de tu código aquí 📷"}
               onDragOver={e => e.preventDefault()}
-              onDrop={e => {
-                e.preventDefault();
-                const file = e.dataTransfer.files[0];
-                if (!file || !file.type.startsWith("image/")) return;
-                const reader = new FileReader();
-                reader.onload = () => { setImage({ base64: reader.result.split(",")[1], mediaType: file.type, preview: reader.result }); setCode(""); };
-                reader.readAsDataURL(file);
-              }}
+              onDrop={e => { e.preventDefault(); addImages(e.dataTransfer.files); }}
               onKeyDown={e => {
                 if (e.key === "Tab") {
                   e.preventDefault();
