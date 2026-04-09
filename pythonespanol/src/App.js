@@ -17,24 +17,19 @@ const C = {
   white:       "#FFFFFF",
 };
 
-// Typography — one system, used everywhere
 const T = {
-  // Font families
   sans:  '"Noto Sans", "Open Sans", "Helvetica Neue", Arial, sans-serif',
   serif: '"Montserrat", sans-serif',
   mono:  '"Courier New", monospace',
-  // Font sizes
   xs:    9,
   sm:    11,
   base:  13,
   md:    15,
   lg:    17,
-  // Font weights
   light:  300,
   normal: 400,
   bold:   700,
   black:  900,
-  // Letter spacing
   tight:  0,
   normal_spacing: 1,
   wide:   2,
@@ -42,7 +37,6 @@ const T = {
   widest: 4,
 };
 
-// Spacing — consistent scale
 const S = {
   xs:  4,
   sm:  8,
@@ -54,7 +48,7 @@ const S = {
 };
 
 // ============================================
-// SHARED BUTTON STYLE — used everywhere
+// SHARED BUTTON STYLES
 // ============================================
 function btnPrimary(disabled) {
   return {
@@ -131,6 +125,7 @@ REGLAS CRÍTICAS:
 - NUNCA repitas las listas, arrays, o datos del input en tu respuesta. Si el código tiene listas largas, en tu corrección escribe solo la lógica — no los datos.
 - El código corregido siempre debe estar COMPLETO. Nunca lo dejes cortado o incompleto.
 - Si el error es de lógica, muestra solo la parte corregida — no todo el archivo.
+- Si recibes una imagen, extrae el código que aparece en ella y analízalo igual que si te lo hubieran pegado.
 
 FRASES DE APERTURA — una línea, seca, inteligente, universal:
 - SyntaxError: "Python intentó leerlo. No pudo. Nadie pudo."
@@ -159,8 +154,6 @@ El problema:
 ► [Una línea. El insight clave.]
 
 Español neutro. Sin "ya saben", "miren", "con todo respeto".`;
-
-
 
 const LOADING_FRASES = [
   "Consultando con mis asesores...",
@@ -256,20 +249,12 @@ function AMLOCartoon() {
 // ============================================
 function highlightCode(line) {
   const keywords = /\b(def|return|if|elif|else|for|while|in|and|or|not|import|from|class|try|except|finally|with|as|pass|break|continue|lambda|yield|True|False|None|const|let|var|function|=>|async|await|SELECT|FROM|WHERE|ORDER|BY|GROUP|INSERT|UPDATE|DELETE|JOIN)\b/g;
-  const strings = /(["'`])(?:(?=(\\?))\2.)*?\1/g;
-  const numbers = /\b(\d+\.?\d*)\b/g;
   const comments = /^(\s*)(#.*|\/\/.*)$/;
 
   if (comments.test(line)) {
     return <span style={{ color: "#6A9955" }}>{line}</span>;
   }
 
-  // Simple token colorizer
-  const parts = [];
-  let remaining = line;
-  let key = 0;
-
-  // Split by spaces and color tokens
   const tokens = line.split(/(\s+)/);
   return (
     <span>
@@ -307,6 +292,13 @@ const IconTip = () => (
   </svg>
 );
 
+const IconCamera = () => (
+  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ marginRight: 5, verticalAlign: "middle" }}>
+    <path d="M1 5a1 1 0 011-1h1.5l1-2h5l1 2H14a1 1 0 011 1v8a1 1 0 01-1 1H2a1 1 0 01-1-1V5z" stroke={C.gold} strokeWidth="1.2"/>
+    <circle cx="8" cy="9" r="2.5" stroke={C.gold} strokeWidth="1.2"/>
+  </svg>
+);
+
 // ============================================
 // FORMAT RESPONSE
 // ============================================
@@ -316,13 +308,11 @@ function formatResponse(text) {
   let openingLineDone = false;
 
   return lines.map((line, i) => {
-    // Toggle code block
     if (line.includes("```")) {
       inCodeBlock = !inCodeBlock;
       return null;
     }
 
-    // Inside code block — syntax highlighted
     if (inCodeBlock) {
       return (
         <div key={i} style={{
@@ -337,7 +327,6 @@ function formatResponse(text) {
       );
     }
 
-    // First non-empty line — opening phrase, bold burgundy
     if (!openingLineDone && line.trim() !== "" &&
         !line.startsWith("El problema:") &&
         !line.startsWith("✅") &&
@@ -358,7 +347,6 @@ function formatResponse(text) {
       );
     }
 
-    // Section labels with icons
     if (line.startsWith("El problema:")) {
       return (
         <div key={i} style={{ display: "flex", alignItems: "center", fontSize: T.xs, fontWeight: T.bold, color: C.burgundy, fontFamily: T.mono, letterSpacing: T.widest, textTransform: "uppercase", marginTop: S.lg, marginBottom: S.xs }}>
@@ -383,10 +371,8 @@ function formatResponse(text) {
       );
     }
 
-    // Empty line
     if (line.trim() === "") return <div key={i} style={{ height: S.sm }} />;
 
-    // Regular explanation text
     return (
       <div key={i} style={{
         color: C.textMid,
@@ -414,6 +400,11 @@ export default function App() {
   const [modal, setModal] = useState(null);
   const [historial, setHistorial] = useState([]);
   const [showHistorial, setShowHistorial] = useState(false);
+
+  // ── NEW: image state ──
+  const [image, setImage] = useState(null); // { base64, mediaType, preview }
+  const fileInputRef = useRef(null);
+
   const responseRef = useRef(null);
   const intervalRef = useRef(null);
 
@@ -443,6 +434,25 @@ export default function App() {
     }
   }, [response]);
 
+  // ── NEW: handle image upload ──
+  function handleImageUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    // Reset file input so same file can be re-selected
+    e.target.value = "";
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result.split(",")[1];
+      setImage({ base64, mediaType: file.type, preview: reader.result });
+      setCode(""); // clear text when photo is loaded
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearImage() {
+    setImage(null);
+  }
+
   function saveToHistorial(codigo, respuesta) {
     const entry = {
       id: Date.now(),
@@ -454,11 +464,38 @@ export default function App() {
   }
 
   async function askProfe() {
-    if (!code.trim()) return;
+    if (!code.trim() && !image) return;
     setLoading(true);
     setResponse("");
     setFraseIdx(0);
+
     try {
+      // ── Build message content depending on whether there's an image ──
+      let messageContent;
+      if (image) {
+        messageContent = [
+          {
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: image.mediaType,
+              data: image.base64,
+            },
+          },
+          {
+            type: "text",
+            text: `Analiza el código que aparece en esta imagen.${intention.trim() ? `\n\nResultado esperado: ${intention.trim()}` : ""}`,
+          },
+        ];
+      } else {
+        messageContent = [
+          {
+            type: "text",
+            text: `Analiza este código:\n\`\`\`\n${code}\n\`\`\`${intention.trim() ? `\n\nResultado esperado: ${intention.trim()}` : ""}`,
+          },
+        ];
+      }
+
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
@@ -471,18 +508,23 @@ export default function App() {
           model: "claude-sonnet-4-20250514",
           max_tokens: 1000,
           system: AMLO_SYSTEM_PROMPT,
-          messages: [{ role: "user", content: `Analiza este código:\n\`\`\`\n${code}\n\`\`\`${intention.trim() ? `\n\nResultado esperado: ${intention.trim()}` : ""}` }]
-        })
+          messages: [{ role: "user", content: messageContent }],
+        }),
       });
+
       const data = await res.json();
-      const text = data.content?.find(b => b.type === "text")?.text || "Pos no pude analizarlo. Inténtele de nuevo.";
+      const text =
+        data.content?.find(b => b.type === "text")?.text ||
+        "Pos no pude analizarlo. Inténtele de nuevo.";
       setResponse(text);
-      saveToHistorial(code, text);
+      saveToHistorial(image ? "[foto de código]" : code, text);
     } catch {
       setResponse("Se cayó la conexión. Como el sistema de salud en el régimen anterior.");
     }
     setLoading(false);
   }
+
+  const canSubmit = !loading && (!!code.trim() || !!image);
 
   return (
     <div style={{ minHeight: "100vh", background: C.cream, color: C.text, fontFamily: T.sans, fontWeight: T.light, padding: "0 0 80px 0" }}>
@@ -535,7 +577,7 @@ export default function App() {
           <div style={{ width: 60, height: 3, background: `linear-gradient(90deg, ${C.gold}, ${C.olive})`, marginBottom: S.lg, borderRadius: 2 }} />
           <div style={{ fontSize: T.md, color: C.textMid, fontFamily: T.sans, fontWeight: T.light, lineHeight: 1.7, marginBottom: S.xl, maxWidth: 340 }}>
             AI te dio código que no funciona.<br/><br/>
-            Pega tu código — Python, JavaScript, Java, SQL, lo que sea. El Profesor te dice qué está mal.<br/><br/>
+            Pega tu código o sube una foto — Python, JavaScript, Java, SQL, lo que sea. El Profesor te dice qué está mal.<br/><br/>
             <strong style={{ fontWeight: T.bold, color: C.burgundy }}>En español. Gratis.</strong>
           </div>
         </div>
@@ -568,6 +610,7 @@ export default function App() {
                       <li style={{ marginBottom: S.sm }}>Recibir el código corregido con explicación</li>
                       <li style={{ marginBottom: S.sm }}>Aprender programación sin la barrera del inglés</li>
                       <li style={{ marginBottom: S.sm }}>Arreglar el código que te dio una AI</li>
+                      <li style={{ marginBottom: S.sm }}>Subir fotos o screenshots de tu código</li>
                     </ul>
                     <p style={{ color: C.textLight, fontSize: T.sm, fontStyle: "italic", marginBottom: 0 }}>Sin registro. Sin costo.</p>
                   </div>
@@ -576,7 +619,7 @@ export default function App() {
                   <div>
                     <p style={{ marginTop: 0 }}>Fíjense bien, les voy a explicar paso a paso. No es complicado.</p>
                     <ol style={{ paddingLeft: S.xl, color: C.textMid }}>
-                      <li style={{ marginBottom: S.md }}><strong style={{ color: C.burgundy, fontWeight: T.bold }}>Escribe o pega tu código</strong> en el cuadro de abajo.</li>
+                      <li style={{ marginBottom: S.md }}><strong style={{ color: C.burgundy, fontWeight: T.bold }}>Escribe o pega tu código</strong> en el cuadro — o sube una foto con el botón 📷.</li>
                       <li style={{ marginBottom: S.md }}><strong style={{ color: C.burgundy, fontWeight: T.bold }}>Presiona el botón</strong> "Iniciar Debug".</li>
                       <li style={{ marginBottom: S.md }}><strong style={{ color: C.burgundy, fontWeight: T.bold }}>Espera</strong> mientras El Profesor consulta con sus asesores.</li>
                       <li style={{ marginBottom: S.md }}><strong style={{ color: C.burgundy, fontWeight: T.bold }}>Lee la respuesta</strong> — El Profesor te explica y da el código correcto.</li>
@@ -617,11 +660,11 @@ export default function App() {
         {/* EJEMPLOS */}
         <div style={{ marginBottom: S.xxl, display: "flex", gap: S.sm, flexWrap: "wrap" }}>
           {EJEMPLOS.map(ej => (
-            <button key={ej.label} onClick={() => setCode(ej.code)} style={{
+            <button key={ej.label} onClick={() => { setCode(ej.code); setImage(null); }} style={{
               padding: `${S.xs}px ${S.md}px`,
-              border: `1px solid ${code === ej.code ? C.burgundy : C.border}`,
-              background: code === ej.code ? C.burgundy : C.creamDark,
-              color: code === ej.code ? C.gold : C.textMid,
+              border: `1px solid ${code === ej.code && !image ? C.burgundy : C.border}`,
+              background: code === ej.code && !image ? C.burgundy : C.creamDark,
+              color: code === ej.code && !image ? C.gold : C.textMid,
               fontSize: T.sm,
               fontFamily: T.sans,
               fontWeight: T.light,
@@ -638,7 +681,7 @@ export default function App() {
           <input
             value={intention}
             onChange={e => setIntention(e.target.value)}
-            placeholder="¿Qué resultado esperas? (opcional) — ej: quiero que imprima solo los números pares · quiero crear un programa para mi negocio"
+            placeholder="¿Qué resultado esperas? (opcional) — ej: quiero que imprima solo los números pares"
             style={{
               width: "100%",
               padding: `${S.sm}px ${S.md}px`,
@@ -654,33 +697,79 @@ export default function App() {
           />
         </div>
 
-        {/* CODE INPUT */}
+        {/* CODE / PHOTO INPUT */}
         <div style={{ border: `1px solid ${C.burgundy}`, marginBottom: S.md, boxShadow: `2px 2px 0 ${C.burgundy}` }}>
+
+          {/* Editor header */}
           <div style={{ borderBottom: `1px solid ${C.burgundy}`, padding: `${S.sm}px ${S.lg}px`, display: "flex", justifyContent: "space-between", alignItems: "center", background: C.burgundy }}>
-            <span style={{ ...label(), color: C.gold, fontSize: T.xs, letterSpacing: T.wider }}>codigo_sospechoso.py</span>
-            <span style={{ ...label(), color: "rgba(200,151,31,0.4)", fontSize: T.xs }}>{code.length > 0 ? `${code.length} chars` : "vacío"}</span>
+            <span style={{ ...label(), color: C.gold, fontSize: T.xs, letterSpacing: T.wider }}>
+              {image ? "foto_de_codigo.png" : "codigo_sospechoso.py"}
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: S.sm }}>
+              {/* Remove photo button */}
+              {image && (
+                <button
+                  onClick={clearImage}
+                  style={{ background: "none", border: `1px solid rgba(200,151,31,0.5)`, color: C.gold, fontSize: T.xs, padding: `2px ${S.sm}px`, cursor: "pointer", fontFamily: T.sans, letterSpacing: T.wide, textTransform: "uppercase", transition: "all 0.15s" }}
+                >
+                  ✕ quitar foto
+                </button>
+              )}
+              {/* Upload photo button */}
+              <button
+                onClick={() => fileInputRef.current.click()}
+                style={{ background: image ? C.gold : "none", border: `1px solid ${image ? C.gold : "rgba(200,151,31,0.5)"}`, color: image ? C.burgundy : C.gold, fontSize: T.xs, padding: `2px ${S.sm}px`, cursor: "pointer", fontFamily: T.sans, letterSpacing: T.wide, textTransform: "uppercase", transition: "all 0.15s", display: "flex", alignItems: "center" }}
+              >
+                <IconCamera />{image ? "cambiar foto" : "subir foto"}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                style={{ display: "none" }}
+              />
+              <span style={{ ...label(), color: "rgba(200,151,31,0.4)", fontSize: T.xs }}>
+                {image ? "foto lista" : code.length > 0 ? `${code.length} chars` : "vacío"}
+              </span>
+            </div>
           </div>
-          <textarea
-            value={code}
-            onChange={e => setCode(e.target.value)}
-            placeholder={"# Pega tu código aquí — tuyo o de ChatGPT/Copilot\n# El Profesor lo arregla sin juzgarte (mucho)"}
-            onKeyDown={e => {
-              if (e.key === "Tab") {
-                e.preventDefault();
-                const s = e.target.selectionStart;
-                setCode(c => c.substring(0, s) + "    " + c.substring(e.target.selectionEnd));
-                setTimeout(() => { e.target.selectionStart = e.target.selectionEnd = s + 4; }, 0);
-              }
-            }}
-            style={{ width: "100%", minHeight: 200, padding: S.lg, background: C.white, border: "none", outline: "none", color: C.text, fontSize: T.base, lineHeight: 1.8, fontFamily: T.mono, resize: "vertical", boxSizing: "border-box" }}
-          />
+
+          {/* Photo preview OR textarea */}
+          {image ? (
+            <div style={{ padding: S.lg, background: C.white, textAlign: "center", minHeight: 200, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: S.md }}>
+              <img
+                src={image.preview}
+                alt="Código para analizar"
+                style={{ maxWidth: "100%", maxHeight: 320, border: `1px solid ${C.border}`, display: "block" }}
+              />
+              <span style={{ ...label(), fontSize: T.xs, color: C.textLight }}>
+                El Profesor analizará el código en esta imagen
+              </span>
+            </div>
+          ) : (
+            <textarea
+              value={code}
+              onChange={e => setCode(e.target.value)}
+              placeholder={"# Pega tu código aquí — tuyo o de ChatGPT/Copilot\n# El Profesor lo arregla sin juzgarte (mucho)\n# O sube una foto con el botón de arriba →"}
+              onKeyDown={e => {
+                if (e.key === "Tab") {
+                  e.preventDefault();
+                  const s = e.target.selectionStart;
+                  setCode(c => c.substring(0, s) + "    " + c.substring(e.target.selectionEnd));
+                  setTimeout(() => { e.target.selectionStart = e.target.selectionEnd = s + 4; }, 0);
+                }
+              }}
+              style={{ width: "100%", minHeight: 200, padding: S.lg, background: C.white, border: "none", outline: "none", color: C.text, fontSize: T.base, lineHeight: 1.8, fontFamily: T.mono, resize: "vertical", boxSizing: "border-box" }}
+            />
+          )}
         </div>
 
         {/* SUBMIT BUTTON */}
         <button
           onClick={askProfe}
-          disabled={loading || !code.trim()}
-          style={{ ...btnPrimary(loading || !code.trim()), width: "100%", padding: `${S.lg}px`, marginBottom: S.xxxl, boxShadow: loading || !code.trim() ? "none" : `2px 2px 0 ${C.text}`, letterSpacing: T.widest }}
+          disabled={!canSubmit}
+          style={{ ...btnPrimary(!canSubmit), width: "100%", padding: `${S.lg}px`, marginBottom: S.xxxl, boxShadow: canSubmit ? `2px 2px 0 ${C.text}` : "none", letterSpacing: T.widest }}
         >
           {loading ? `... ${LOADING_FRASES[fraseIdx]}` : "Iniciar Debug"}
         </button>
@@ -719,7 +808,7 @@ export default function App() {
             {showHistorial && (
               <div style={{ marginTop: S.sm }}>
                 {historial.map(entry => (
-                  <div key={entry.id} onClick={() => setCode(entry.codigo.replace("...", ""))} style={{ border: `1px solid ${C.border}`, background: C.white, padding: `${S.md}px ${S.lg}px`, marginBottom: S.sm, cursor: "pointer" }}>
+                  <div key={entry.id} style={{ border: `1px solid ${C.border}`, background: C.white, padding: `${S.md}px ${S.lg}px`, marginBottom: S.sm }}>
                     <div style={{ ...label(), marginBottom: S.xs }}>{entry.fecha}</div>
                     <div style={{ fontSize: T.sm, color: C.text, fontFamily: T.mono, marginBottom: S.xs }}>{entry.codigo}</div>
                     <div style={{ fontSize: T.sm, color: C.burgundy, fontStyle: "italic" }}>{entry.resumen}</div>
