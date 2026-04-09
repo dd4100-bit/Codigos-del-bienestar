@@ -406,6 +406,7 @@ function formatResponse(text) {
 // ============================================
 export default function App() {
   const [code, setCode] = useState("");
+  const [intention, setIntention] = useState("");
   const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
   const [fraseIdx, setFraseIdx] = useState(0);
@@ -470,7 +471,7 @@ export default function App() {
           model: "claude-sonnet-4-20250514",
           max_tokens: 1000,
           system: AMLO_SYSTEM_PROMPT,
-          messages: [{ role: "user", content: `Analiza este código:\n\`\`\`\n${code}\n\`\`\`` }]
+          messages: [{ role: "user", content: `Analiza este código:\n\`\`\`\n${code}\n\`\`\`${intention.trim() ? `\n\nResultado esperado: ${intention.trim()}` : ""}` }]
         })
       });
       const data = await res.json();
@@ -630,6 +631,27 @@ export default function App() {
               transition: "all 0.15s",
             }}>{ej.label}</button>
           ))}
+        </div>
+
+        {/* INTENTION INPUT */}
+        <div style={{ marginBottom: S.md }}>
+          <input
+            value={intention}
+            onChange={e => setIntention(e.target.value)}
+            placeholder="¿Qué resultado esperas? (opcional) — ej: quiero que imprima solo los números pares · quiero crear un programa para mi negocio"
+            style={{
+              width: "100%",
+              padding: `${S.sm}px ${S.md}px`,
+              border: `1px solid ${C.border}`,
+              background: C.creamDark,
+              color: C.textMid,
+              fontSize: T.sm,
+              fontFamily: T.sans,
+              outline: "none",
+              boxSizing: "border-box",
+              letterSpacing: T.normal_spacing,
+            }}
+          />
         </div>
 
         {/* CODE INPUT */}
