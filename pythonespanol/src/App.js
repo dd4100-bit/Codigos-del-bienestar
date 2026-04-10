@@ -245,6 +245,11 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [fraseIdx, setFraseIdx] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [selection, setSelection] = useState("");
+  const [selectionPos, setSelectionPos] = useState({ x: 0, y: 0 });
+  const [selectionNote, setSelectionNote] = useState("");
+  const [selectionLoading, setSelectionLoading] = useState(false);
+  const [showSelectionPopup, setShowSelectionPopup] = useState(false);
   const [modal, setModal] = useState(null);
   const [historial, setHistorial] = useState([]);
   const [showHistorial, setShowHistorial] = useState(false);
@@ -282,6 +287,65 @@ export default function App() {
       resumen: respuesta.substring(0, 120) + "...",
     };
     setHistorial(prev => [entry, ...prev].slice(0, 10));
+  }
+
+  function handleTextSelection() {
+    const sel = window.getSelection();
+    if (!sel || sel.toString().trim().length < 3) return;
+    const text = sel.toString().trim();
+    const range = sel.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    setSelection(text);
+    setSelectionPos({ x: rect.left + rect.width / 2, y: rect.top + window.scrollY - 10 });
+    setSelectionNote("");
+    setShowSelectionPopup(true);
+  }
+
+  async function explainSelection() {
+    if (!selection) return;
+    setSelectionLoading(true);
+    setSelectionNote("");
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 300,
+          stream: true,
+          system: "Eres El Profesor — explica fragmentos de código en español. Máximo 3 líneas. Directo, técnico, sin relleno. Sin saludos ni introducciones.",
+          messages: [{ role: "user", content: `Explica este fragmento de código en máximo 3 líneas:\n\n${selection}` }]
+        })
+      });
+      setSelectionLoading(false);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n").filter(l => l.startsWith("data: "));
+        for (const line of lines) {
+          const json = line.replace("data: ", "").trim();
+          if (json === "[DONE]") break;
+          try {
+            const parsed = JSON.parse(json);
+            const delta = parsed.delta?.text;
+            if (delta) { fullText += delta; setSelectionNote(fullText); }
+          } catch {}
+        }
+      }
+    } catch {
+      setSelectionLoading(false);
+      setSelectionNote("No pude explicarlo. Inténtalo de nuevo.");
+    }
+    setSelectionLoading(false);
   }
 
   function readImageFile(file) {
@@ -375,7 +439,7 @@ export default function App() {
   const isDisabled = loading || (!code.trim() && !images.length);
 
   return (
-    <div style={{ minHeight: "100vh", background: C.cream, color: C.text, fontFamily: T.sans, fontWeight: T.light, padding: "0 0 80px 0" }}>
+    <div onClick={() => { if (showSelectionPopup) { setShowSelectionPopup(false); setSelectionNote(""); } }} style={{ minHeight: "100vh", background: C.cream, color: C.text, fontFamily: T.sans, fontWeight: T.light, padding: "0 0 80px 0" }}>
 
       <div style={{ height: 6, background: `linear-gradient(90deg, ${C.burgundy}, ${C.burgundyMid} 40%, ${C.gold} 60%, ${C.olive})` }} />
 
@@ -623,8 +687,51 @@ export default function App() {
           {loading ? `... ${LOADING_FRASES[fraseIdx]}` : "Iniciar Debug"}
         </button>
 
+        {/* SELECTION POPUP */}
+        {showSelectionPopup && (
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              position: "absolute",
+              left: selectionPos.x,
+              top: selectionPos.y,
+              transform: "translateX(-50%)",
+              zIndex: 200,
+              background: C.text,
+              border: `1px solid ${C.gold}`,
+              boxShadow: `3px 3px 0 ${C.burgundy}`,
+              maxWidth: 340,
+              minWidth: 200,
+            }}
+          >
+            <div style={{ background: C.burgundy, padding: `${S.xs}px ${S.md}px`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ ...label(), color: C.gold, fontSize: T.xs, letterSpacing: T.wider }}>¿Qué es esto?</span>
+              <button onClick={() => { setShowSelectionPopup(false); setSelectionNote(""); }} style={{ background: "none", border: "none", color: C.gold, cursor: "pointer", fontSize: 12, lineHeight: 1 }}>✕</button>
+            </div>
+            <div style={{ padding: `${S.sm}px ${S.md}px`, background: C.creamDark, borderBottom: `1px solid ${C.border}` }}>
+              <code style={{ fontSize: T.xs, color: C.burgundy, fontFamily: T.mono, wordBreak: "break-all" }}>{selection.length > 80 ? selection.substring(0, 80) + "..." : selection}</code>
+            </div>
+            {!selectionNote && !selectionLoading && (
+              <button
+                onClick={explainSelection}
+                style={{ ...btnPrimary(false), width: "100%", padding: `${S.sm}px`, fontSize: T.xs, letterSpacing: T.wide }}
+              >
+                Explicar ↗
+              </button>
+            )}
+            {selectionLoading && (
+              <div style={{ padding: S.md, color: C.textLight, fontSize: T.xs, fontFamily: T.mono, textAlign: "center" }}>analizando...</div>
+            )}
+            {selectionNote && (
+              <div style={{ padding: S.md, color: C.textMid, fontSize: T.sm, fontFamily: T.mono, lineHeight: 1.7, background: C.white }}>
+                {selectionNote}
+              </div>
+            )}
+          </div>
+        )}
+
         {response && (
-          <div ref={responseRef} style={{ border: `1px solid ${C.burgundy}`, animation: "fadeIn 0.4s ease", boxShadow: `3px 3px 0 ${C.burgundy}` }}>
+          <div ref={responseRef} onMouseUp={handleTextSelection} style={{ border: `1px solid ${C.burgundy}`, animation: "fadeIn 0.4s ease", boxShadow: `3px 3px 0 ${C.burgundy}`, position: "relative" }}>
             <div style={{ borderBottom: `1px solid ${C.burgundy}`, padding: `${S.md}px ${S.xl}px`, display: "flex", alignItems: "center", justifyContent: "space-between", background: C.burgundy }}>
               <div>
                 <div style={{ fontWeight: T.bold, fontSize: T.sm, color: C.gold, letterSpacing: T.wide, textTransform: "uppercase", fontFamily: T.sans }}>El Profesor</div>
