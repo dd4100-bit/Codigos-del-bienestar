@@ -3,11 +3,13 @@ import { C, T } from "./constants";
 import Profesor from "./components/Profesor";
 import TutorMode from "./components/TutorMode";
 import Chat from "./components/Chat";
+import Game from "./game";
 
 export default function App() {
   const [code, setCode] = useState("");
   const [images, setImages] = useState([]);
   const [tutorMode, setTutorMode] = useState(false);
+  const [gameMode, setGameMode] = useState(false);
   const [terminalOutput, setTerminalOutput] = useState([]);
   const [terminalLoading, setTerminalLoading] = useState(false);
   const [pyodideReady, setPyodideReady] = useState(false);
@@ -55,6 +57,12 @@ export default function App() {
 
   return (
     <>
+      {gameMode && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 600, overflow: "auto" }}>
+          <Game onClose={() => setGameMode(false)} />
+        </div>
+      )}
+
       {tutorMode && (
         <TutorMode
           code={code}
@@ -66,6 +74,27 @@ export default function App() {
           setTerminalOutput={setTerminalOutput}
           terminalLoading={terminalLoading}
         />
+      )}
+
+      {!tutorMode && !gameMode && (
+        /* Game launch button — fixed bottom-right */
+        <button
+          onClick={() => setGameMode(true)}
+          style={{
+            position: "fixed", bottom: 24, right: 24, zIndex: 500,
+            background: C.burgundy, border: `2px solid ${C.gold}`,
+            color: C.gold, padding: "10px 18px",
+            fontFamily: T.serif, fontWeight: 900, fontSize: 13,
+            letterSpacing: 2, textTransform: "uppercase",
+            cursor: "pointer", borderRadius: 6,
+            boxShadow: `0 0 18px ${C.burgundy}99, 2px 2px 0 ${C.gold}44`,
+            transition: "all 0.15s",
+          }}
+          onMouseEnter={e => e.target.style.opacity = "0.85"}
+          onMouseLeave={e => e.target.style.opacity = "1"}
+        >
+          ⚔️ Code Combat
+        </button>
       )}
 
       {!tutorMode && (
