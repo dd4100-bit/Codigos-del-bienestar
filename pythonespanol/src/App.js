@@ -299,7 +299,7 @@ export default function App() {
         if (text.length < 3) return;
         const rect = ta.getBoundingClientRect();
         setSelection(text);
-        setSelectionPos({ x: rect.left + rect.width / 2, y: rect.top + window.scrollY - 10 });
+        setSelectionPos({ x: rect.left + rect.width / 2, y: rect.top - 10 });
         setSelectionNote("");
         setShowSelectionPopup(true);
         return;
@@ -313,7 +313,7 @@ export default function App() {
         const rect = range.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) return;
         setSelection(text);
-        setSelectionPos({ x: rect.left + rect.width / 2, y: rect.top + window.scrollY - 10 });
+        setSelectionPos({ x: rect.left + rect.width / 2, y: rect.top - 10 });
         setSelectionNote("");
         setShowSelectionPopup(true);
       } catch {}
@@ -713,11 +713,11 @@ export default function App() {
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              position: "absolute",
+              position: "fixed",
               left: selectionPos.x,
               top: selectionPos.y,
               transform: "translateX(-50%)",
-              zIndex: 200,
+              zIndex: 9999,
               background: C.text,
               border: `1px solid ${C.gold}`,
               boxShadow: `3px 3px 0 ${C.burgundy}`,
