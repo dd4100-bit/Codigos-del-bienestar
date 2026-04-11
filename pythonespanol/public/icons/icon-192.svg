@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <!-- Background with slight rounding for maskable safe zone -->
+  <rect width="192" height="192" fill="#6B1223"/>
+
+  <!-- Subtle border glow -->
+  <rect x="6" y="6" width="180" height="180" rx="4" fill="none"
+        stroke="#C8971F" stroke-width="2" opacity="0.35"/>
+
+  <!-- Top accent bar -->
+  <rect x="0" y="0" width="192" height="8" fill="#C8971F"/>
+
+  <!-- Letter P — Georgia-style, gold -->
+  <!-- Stem -->
+  <rect x="54" y="42" width="18" height="108" rx="3" fill="#C8971F"/>
+  <!-- Bowl top -->
+  <rect x="54" y="42" width="72" height="18" rx="3" fill="#C8971F"/>
+  <!-- Bowl bottom -->
+  <rect x="54" y="96" width="72" height="18" rx="3" fill="#C8971F"/>
+  <!-- Bowl right side -->
+  <rect x="108" y="42" width="18" height="72" rx="3" fill="#C8971F"/>
+
+  <!-- Bottom accent bar -->
+  <rect x="0" y="184" width="192" height="8" fill="#C8971F"/>
+</svg>

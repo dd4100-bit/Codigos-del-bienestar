@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#6B1223"/>
+
+  <!-- Subtle border glow -->
+  <rect x="16" y="16" width="480" height="480" rx="8" fill="none"
+        stroke="#C8971F" stroke-width="4" opacity="0.35"/>
+
+  <!-- Top accent bar -->
+  <rect x="0" y="0" width="512" height="20" fill="#C8971F"/>
+
+  <!-- Letter P — gold -->
+  <!-- Stem -->
+  <rect x="144" y="112" width="48" height="288" rx="8" fill="#C8971F"/>
+  <!-- Bowl top -->
+  <rect x="144" y="112" width="192" height="48" rx="8" fill="#C8971F"/>
+  <!-- Bowl bottom -->
+  <rect x="144" y="256" width="192" height="48" rx="8" fill="#C8971F"/>
+  <!-- Bowl right side -->
+  <rect x="288" y="112" width="48" height="192" rx="8" fill="#C8971F"/>
+
+  <!-- Bottom accent bar -->
+  <rect x="0" y="492" width="512" height="20" fill="#C8971F"/>
+</svg>
