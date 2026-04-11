@@ -3,6 +3,104 @@ import { C, T, S, label, btnPrimary, btnSecondary, btnGhost, AMLO_SYSTEM_PROMPT,
 import { AMLOCartoon, formatResponse } from "./utils";
 import Terminal from "./Terminal";
 
+// ── File attachment helpers ────────────────────────────────────────────────────
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+    const s = document.createElement("script");
+    s.src = src; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function getPdfJs() {
+  if (!window.pdfjsLib) {
+    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js");
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  }
+  return window.pdfjsLib;
+}
+
+async function getJSZip() {
+  if (!window.JSZip) {
+    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js");
+  }
+  return window.JSZip;
+}
+
+const TEXT_EXTS = new Set([
+  "py","js","ts","jsx","tsx","java","c","cpp","cs","go","rb","php","swift",
+  "kt","rs","sh","bash","zsh","sql","html","css","scss","less","json","xml",
+  "yaml","yml","toml","ini","cfg","conf","env","txt","md","csv","r","m","pl",
+]);
+
+async function extractTextFromFile(file) {
+  const ext = file.name.split(".").pop().toLowerCase();
+
+  // Plain text / code
+  if (TEXT_EXTS.has(ext)) return await file.text();
+
+  // PDF
+  if (ext === "pdf") {
+    const pdfjsLib = await getPdfJs();
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pages = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      pages.push(content.items.map(it => it.str).join(" "));
+    }
+    return pages.join("\n\n");
+  }
+
+  // DOCX / PAGES (both are ZIP archives)
+  if (ext === "docx" || ext === "pages") {
+    const JSZip = await getJSZip();
+    const zip = await JSZip.loadAsync(file);
+    const xmlFile = ext === "docx"
+      ? zip.files["word/document.xml"]
+      : zip.files["index.xml"] ?? zip.files["QuickLook/Preview.pdf"];
+
+    if (ext === "pages" && xmlFile?.name?.endsWith(".pdf")) {
+      // Fallback: extract the PDF preview inside .pages
+      const pdfData = await xmlFile.async("arraybuffer");
+      const pdfjsLib = await getPdfJs();
+      const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+      const pages = [];
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        pages.push(content.items.map(it => it.str).join(" "));
+      }
+      return pages.join("\n\n");
+    }
+
+    if (!xmlFile) throw new Error(`No se encontró contenido en el archivo ${ext}`);
+    const xml = await xmlFile.async("string");
+    // Strip XML tags, collapse whitespace
+    return xml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  }
+
+  // DOC (binary) — extract printable ASCII strings
+  if (ext === "doc") {
+    const ab = await file.arrayBuffer();
+    const bytes = new Uint8Array(ab);
+    let result = "";
+    for (let i = 0; i < bytes.length; i++) {
+      const c = bytes[i];
+      if ((c >= 32 && c < 127) || c === 10 || c === 13) result += String.fromCharCode(c);
+    }
+    // Keep runs of printable chars ≥ 4 long (filter binary noise)
+    return result.match(/[\x20-\x7E\n\r]{4,}/g)?.join("\n") ?? "";
+  }
+
+  // Unknown — try as text anyway
+  return await file.text();
+}
+
 export default function Profesor({ code, setCode, images, setImages, runPython, onStartTutor, pyodideReady, terminalOutput, setTerminalOutput, terminalLoading }) {
   const [intention, setIntention] = useState("");
   const [response, setResponse] = useState("");
@@ -20,9 +118,13 @@ export default function Profesor({ code, setCode, images, setImages, runPython, 
   const [offlineDone, setOfflineDone]         = useState(false);
   const [offlineCount, setOfflineCount]       = useState(0);
 
-  const fileInputRef = useRef(null);
-  const responseRef = useRef(null);
-  const intervalRef = useRef(null);
+  const [attachedFile, setAttachedFile]   = useState(null); // { name } | null
+  const [attachLoading, setAttachLoading] = useState(false);
+
+  const fileInputRef   = useRef(null);
+  const attachInputRef = useRef(null);
+  const responseRef    = useRef(null);
+  const intervalRef    = useRef(null);
 
   useEffect(() => {
     try { const s = localStorage.getItem("elprofesor_historial"); if (s) setHistorial(JSON.parse(s)); } catch {}
@@ -177,6 +279,23 @@ Responde SOLO con este JSON array (sin markdown, sin texto adicional):
 
   function handleImageUpload(e) {
     addImages(e.target.files);
+  }
+
+  async function handleFileAttach(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setAttachLoading(true);
+    try {
+      const text = await extractTextFromFile(file);
+      setCode(text);
+      setImages([]);
+      setAttachedFile({ name: file.name });
+    } catch (err) {
+      setCode(`# Error al leer el archivo: ${err.message}`);
+      setAttachedFile({ name: file.name });
+    }
+    setAttachLoading(false);
   }
 
   function removeImage(idx) {
@@ -515,7 +634,7 @@ Responde SOLO con este JSON array (sin markdown, sin texto adicional):
 
         <div style={{ marginBottom: S.xxl, display: "flex", gap: S.sm, flexWrap: "wrap" }}>
           {EJEMPLOS.map(ej => (
-            <button key={ej.label} onClick={() => { setCode(ej.code); setImages([]); }} style={{
+            <button key={ej.label} onClick={() => { setCode(ej.code); setImages([]); setAttachedFile(null); }} style={{
               padding: `${S.xs}px ${S.md}px`,
               border: `1px solid ${code === ej.code ? C.burgundy : C.border}`,
               background: code === ej.code ? C.burgundy : C.creamDark,
@@ -542,12 +661,16 @@ Responde SOLO con este JSON array (sin markdown, sin texto adicional):
           {/* Header bar */}
           <div style={{ borderBottom: `1px solid ${C.burgundy}`, padding: `${S.sm}px ${S.lg}px`, display: "flex", justifyContent: "space-between", alignItems: "center", background: C.burgundy }}>
             <span style={{ ...label(), color: C.gold, fontSize: T.xs, letterSpacing: T.wider }}>
-              {images.length ? `${images.length} foto(s) cargada(s)` : "codigo_sospechoso.py"}
+              {images.length
+                ? `${images.length} foto(s) cargada(s)`
+                : attachedFile
+                  ? attachedFile.name
+                  : "codigo_sospechoso.py"}
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: S.sm }}>
-              {images.length > 0 && (
+              {(images.length > 0 || attachedFile) && (
                 <button
-                  onClick={() => setImages([])}
+                  onClick={() => { setImages([]); setAttachedFile(null); setCode(""); }}
                   style={{ background: "none", border: `1px solid rgba(200,151,31,0.5)`, color: C.gold, fontSize: T.xs, padding: `2px ${S.sm}px`, cursor: "pointer", fontFamily: T.sans, letterSpacing: T.wide, textTransform: "uppercase" }}
                 >
                   ✕ Quitar todo
@@ -573,8 +696,30 @@ Responde SOLO con este JSON array (sin markdown, sin texto adicional):
                 onChange={handleImageUpload}
                 style={{ display: "none" }}
               />
+              <button
+                onClick={() => attachInputRef.current.click()}
+                disabled={attachLoading}
+                style={{
+                  background: attachedFile ? C.gold : "none",
+                  border: `1px solid ${attachedFile ? C.gold : "rgba(200,151,31,0.5)"}`,
+                  color: attachedFile ? C.burgundy : C.gold,
+                  fontSize: T.xs, padding: `2px ${S.sm}px`, cursor: attachLoading ? "wait" : "pointer",
+                  fontFamily: T.sans, letterSpacing: T.wide, textTransform: "uppercase",
+                  fontWeight: attachedFile ? T.bold : T.normal,
+                  opacity: attachLoading ? 0.6 : 1,
+                }}
+              >
+                {attachLoading ? "⏳" : "📎 Archivo"}
+              </button>
+              <input
+                ref={attachInputRef}
+                type="file"
+                accept=".py,.js,.ts,.jsx,.tsx,.java,.c,.cpp,.cs,.go,.rb,.php,.swift,.kt,.rs,.sh,.sql,.html,.css,.json,.xml,.yaml,.yml,.toml,.ini,.cfg,.conf,.env,.txt,.md,.csv,.r,.m,.pl,.pdf,.docx,.doc,.pages"
+                onChange={handleFileAttach}
+                style={{ display: "none" }}
+              />
               <span style={{ ...label(), color: "rgba(200,151,31,0.4)", fontSize: T.xs }}>
-                {images.length ? `${images.length}/20 fotos` : code.length > 0 ? `${code.length} chars` : "vacío"}
+                {images.length ? `${images.length}/20 fotos` : attachedFile ? `${code.length} chars` : code.length > 0 ? `${code.length} chars` : "vacío"}
               </span>
             </div>
           </div>
