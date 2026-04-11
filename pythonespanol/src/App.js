@@ -246,11 +246,21 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [fraseIdx, setFraseIdx] = useState(0);
   const [copied, setCopied] = useState(false);
-  const [selection, setSelection] = useState("");
-  const [selectionPos, setSelectionPos] = useState({ x: 0, y: 0 });
-  const [selectionNote, setSelectionNote] = useState("");
-  const [selectionLoading, setSelectionLoading] = useState(false);
-  const [showSelectionPopup, setShowSelectionPopup] = useState(false);
+  // Side panel chat
+  const [sideQuestion, setSideQuestion] = useState("");
+  const [sideLoading, setSideLoading] = useState(false);
+  const [showSidePanel, setShowSidePanel] = useState(false);
+  const [chatHistory, setChatHistory] = useState([]); // [{role, content}]
+  const chatBottomRef = useRef(null);
+
+  // Python terminal
+  const [terminalCode, setTerminalCode] = useState("");
+  const [terminalOutput, setTerminalOutput] = useState([]);
+  const [terminalLoading, setTerminalLoading] = useState(false);
+  const [pyodideReady, setPyodideReady] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
+  const pyodideRef = useRef(null);
+  const terminalBottomRef = useRef(null);
   const [modal, setModal] = useState(null);
   const [historial, setHistorial] = useState([]);
   const [showHistorial, setShowHistorial] = useState(false);
@@ -280,6 +290,31 @@ export default function App() {
     if (response && responseRef.current) responseRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [response]);
 
+  // Load Pyodide
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js";
+    script.onload = async () => {
+      try {
+        const py = await window.loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/" });
+        pyodideRef.current = py;
+        setPyodideReady(true);
+      } catch {}
+    };
+    document.head.appendChild(script);
+  }, []);
+
+  // Scroll chat to bottom
+  useEffect(() => {
+    if (chatBottomRef.current) chatBottomRef.current.scrollIntoView({ behavior: "smooth" });
+  }, [chatHistory]);
+
+  // Scroll terminal to bottom
+  useEffect(() => {
+    if (terminalBottomRef.current) terminalBottomRef.current.scrollIntoView({ behavior: "smooth" });
+  }, [terminalOutput]);
+
   function saveToHistorial(codigo, respuesta) {
     const entry = {
       id: Date.now(),
@@ -290,45 +325,17 @@ export default function App() {
     setHistorial(prev => [entry, ...prev].slice(0, 10));
   }
 
-  useEffect(() => {
-    function handleTextSelection(e) {
-      const mouseX = e.clientX;
-      const mouseY = e.clientY;
 
-      // Case 1: textarea selection
-      if (e.target.tagName === "TEXTAREA") {
-        const ta = e.target;
-        const text = ta.value.substring(ta.selectionStart, ta.selectionEnd).trim();
-        if (text.length < 3) return;
-        setSelection(text);
-        setSelectionPos({ x: mouseX, y: mouseY - 40 });
-        setSelectionNote("");
-        setShowSelectionPopup(true);
-        return;
-      }
 
-      // Case 2: normal DOM selection
-      const sel = window.getSelection();
-      if (!sel || sel.toString().trim().length < 3) return;
-      const text = sel.toString().trim();
-      try {
-        const range = sel.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-        if (rect.width === 0 && rect.height === 0) return;
-        setSelection(text);
-        setSelectionPos({ x: rect.left + rect.width / 2, y: rect.top - 10 });
-        setSelectionNote("");
-        setShowSelectionPopup(true);
-      } catch {}
-    }
-    document.addEventListener("mouseup", handleTextSelection);
-    return () => document.removeEventListener("mouseup", handleTextSelection);
-  }, []);
-
-  async function explainSelection() {
-    if (!selection) return;
-    setSelectionLoading(true);
-    setSelectionNote("");
+  async function askSidePanel() {
+    if (!sideQuestion.trim()) return;
+    const userMsg = { role: "user", content: sideQuestion };
+    const newHistory = [...chatHistory, userMsg];
+    setChatHistory(newHistory);
+    setSideQuestion("");
+    setSideLoading(true);
+    const assistantPlaceholder = { role: "assistant", content: "" };
+    setChatHistory([...newHistory, assistantPlaceholder]);
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -340,13 +347,13 @@ export default function App() {
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 300,
+          max_tokens: 500,
           stream: true,
-          system: "Eres El Profesor — explica fragmentos de código en español. Máximo 3 líneas. Directo, técnico, sin relleno. Sin saludos ni introducciones.",
-          messages: [{ role: "user", content: `Explica este fragmento de código en máximo 3 líneas:\n\n${selection}` }]
+          system: "Eres El Profesor — tutor de programación en español. Recuerdas el contexto de la conversación. Directo, técnico, sin relleno. Sin saludos.",
+          messages: newHistory
         })
       });
-      setSelectionLoading(false);
+      setSideLoading(false);
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let fullText = "";
@@ -361,15 +368,46 @@ export default function App() {
           try {
             const parsed = JSON.parse(json);
             const delta = parsed.delta?.text;
-            if (delta) { fullText += delta; setSelectionNote(fullText); }
+            if (delta) {
+              fullText += delta;
+              setChatHistory(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1] = { role: "assistant", content: fullText };
+                return updated;
+              });
+            }
           } catch {}
         }
       }
     } catch {
-      setSelectionLoading(false);
-      setSelectionNote("No pude explicarlo. Inténtalo de nuevo.");
+      setSideLoading(false);
+      setChatHistory(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1] = { role: "assistant", content: "Se cayó la conexión. Inténtalo de nuevo." };
+        return updated;
+      });
     }
-    setSelectionLoading(false);
+    setSideLoading(false);
+  }
+
+  async function runPython() {
+    if (!terminalCode.trim() || !pyodideReady) return;
+    setTerminalLoading(true);
+    const input = { type: "input", text: terminalCode };
+    setTerminalOutput(prev => [...prev, input]);
+    try {
+      let output = "";
+      pyodideRef.current.setStdout({ batched: (text) => { output += text + "\n"; } });
+      pyodideRef.current.setStderr({ batched: (text) => { output += "Error: " + text + "\n"; } });
+      await pyodideRef.current.runPythonAsync(terminalCode);
+      if (output.trim()) {
+        setTerminalOutput(prev => [...prev, { type: "output", text: output.trim() }]);
+      }
+    } catch (err) {
+      setTerminalOutput(prev => [...prev, { type: "error", text: err.message }]);
+    }
+    setTerminalCode("");
+    setTerminalLoading(false);
   }
 
   function readImageFile(file) {
@@ -463,7 +501,7 @@ export default function App() {
   const isDisabled = loading || (!code.trim() && !images.length);
 
   return (
-    <div onClick={() => { if (showSelectionPopup) { setShowSelectionPopup(false); setSelectionNote(""); } }} style={{ minHeight: "100vh", background: C.cream, color: C.text, fontFamily: T.sans, fontWeight: T.light, padding: "0 0 80px 0" }}>
+    <div style={{ minHeight: "100vh", background: C.cream, color: C.text, fontFamily: T.sans, fontWeight: T.light, padding: "0 0 80px 0" }}>
 
       <div style={{ height: 6, background: `linear-gradient(90deg, ${C.burgundy}, ${C.burgundyMid} 40%, ${C.gold} 60%, ${C.olive})` }} />
 
@@ -711,46 +749,133 @@ export default function App() {
           {loading ? `... ${LOADING_FRASES[fraseIdx]}` : "Iniciar Debug"}
         </button>
 
-        {/* SELECTION POPUP */}
-        {showSelectionPopup && (
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              position: "fixed",
-              left: selectionPos.x,
-              top: selectionPos.y,
-              transform: "translateX(-50%)",
-              zIndex: 9999,
-              background: C.text,
-              border: `1px solid ${C.gold}`,
-              boxShadow: `3px 3px 0 ${C.burgundy}`,
-              maxWidth: 340,
-              minWidth: 200,
-            }}
+        {/* ── FLOATING BUTTONS LEFT SIDE ── */}
+        <div style={{ position: "fixed", left: 0, top: "40%", transform: "translateY(-50%)", zIndex: 500, display: "flex", flexDirection: "column", gap: S.xs }}>
+          <button
+            onClick={() => { setShowSidePanel(p => !p); setShowTerminal(false); }}
+            style={{ background: showSidePanel ? C.gold : C.burgundy, border: `1px solid ${C.gold}`, color: showSidePanel ? C.burgundy : C.gold, padding: `${S.lg}px ${S.sm}px`, cursor: "pointer", fontFamily: T.mono, fontSize: T.xs, letterSpacing: T.wider, textTransform: "uppercase", writingMode: "vertical-rl", borderRadius: "0 4px 4px 0" }}
           >
-            <div style={{ background: C.burgundy, padding: `${S.xs}px ${S.md}px`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ ...label(), color: C.gold, fontSize: T.xs, letterSpacing: T.wider }}>¿Qué es esto?</span>
-              <button onClick={() => { setShowSelectionPopup(false); setSelectionNote(""); }} style={{ background: "none", border: "none", color: C.gold, cursor: "pointer", fontSize: 12, lineHeight: 1 }}>✕</button>
-            </div>
-            <div style={{ padding: `${S.sm}px ${S.md}px`, background: C.creamDark, borderBottom: `1px solid ${C.border}` }}>
-              <code style={{ fontSize: T.xs, color: C.burgundy, fontFamily: T.mono, wordBreak: "break-all" }}>{selection.length > 80 ? selection.substring(0, 80) + "..." : selection}</code>
-            </div>
-            {!selectionNote && !selectionLoading && (
-              <button
-                onClick={explainSelection}
-                style={{ ...btnPrimary(false), width: "100%", padding: `${S.sm}px`, fontSize: T.xs, letterSpacing: T.wide }}
-              >
-                Explicar ↗
-              </button>
-            )}
-            {selectionLoading && (
-              <div style={{ padding: S.md, color: C.textLight, fontSize: T.xs, fontFamily: T.mono, textAlign: "center" }}>analizando...</div>
-            )}
-            {selectionNote && (
-              <div style={{ padding: S.md, color: C.textMid, fontSize: T.sm, fontFamily: T.mono, lineHeight: 1.7, background: C.white }}>
-                {selectionNote}
+            Chat
+          </button>
+          <button
+            onClick={() => { setShowTerminal(p => !p); setShowSidePanel(false); }}
+            style={{ background: showTerminal ? C.gold : C.burgundy, border: `1px solid ${C.gold}`, color: showTerminal ? C.burgundy : C.gold, padding: `${S.lg}px ${S.sm}px`, cursor: "pointer", fontFamily: T.mono, fontSize: T.xs, letterSpacing: T.wider, textTransform: "uppercase", writingMode: "vertical-rl", borderRadius: "0 4px 4px 0" }}
+          >
+            Python
+          </button>
+        </div>
+
+        {/* ── CHAT PANEL ── */}
+        {showSidePanel && (
+          <div style={{ position: "fixed", left: 0, top: 0, height: "100vh", width: 300, background: C.cream, border: `1px solid ${C.burgundy}`, boxShadow: `3px 0 12px rgba(0,0,0,0.15)`, zIndex: 400, display: "flex", flexDirection: "column" }}>
+            <div style={{ background: C.burgundy, padding: `${S.md}px ${S.lg}px`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+              <div>
+                <div style={{ color: C.gold, fontSize: T.sm, fontFamily: T.sans, fontWeight: T.bold, letterSpacing: T.wide, textTransform: "uppercase" }}>El Profesor</div>
+                <div style={{ ...label(), color: "rgba(200,151,31,0.5)", fontSize: 8 }}>Chat · Pregúntame lo que quieras</div>
               </div>
-            )}
+              <div style={{ display: "flex", gap: S.sm, alignItems: "center" }}>
+                {chatHistory.length > 0 && <button onClick={() => setChatHistory([])} style={{ background: "none", border: `1px solid rgba(200,151,31,0.3)`, color: "rgba(200,151,31,0.6)", fontSize: T.xs, padding: `2px ${S.sm}px`, cursor: "pointer", fontFamily: T.sans, textTransform: "uppercase" }}>Limpiar</button>}
+                <button onClick={() => setShowSidePanel(false)} style={{ background: "none", border: "none", color: C.gold, cursor: "pointer", fontSize: 16 }}>✕</button>
+              </div>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: S.md, display: "flex", flexDirection: "column", gap: S.sm }}>
+              {chatHistory.length === 0 && (
+                <div style={{ color: C.textLight, fontSize: T.sm, fontFamily: T.mono, textAlign: "center", marginTop: S.xxxl, lineHeight: 1.8 }}>
+                  Pregúntame sobre código,<br/>conceptos, errores,<br/>lo que sea.
+                </div>
+              )}
+              {chatHistory.map((msg, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+                  <div style={{
+                    maxWidth: "85%", padding: `${S.sm}px ${S.md}px`,
+                    background: msg.role === "user" ? C.burgundy : C.white,
+                    color: msg.role === "user" ? C.gold : C.textMid,
+                    border: `1px solid ${msg.role === "user" ? C.burgundy : C.border}`,
+                    fontSize: T.sm, fontFamily: T.mono, lineHeight: 1.7,
+                    whiteSpace: "pre-wrap", wordBreak: "break-word",
+                  }}>
+                    {msg.content || (sideLoading && i === chatHistory.length - 1 ? "..." : "")}
+                  </div>
+                </div>
+              ))}
+              <div ref={chatBottomRef} />
+            </div>
+            <div style={{ padding: S.md, borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
+              <textarea
+                value={sideQuestion}
+                onChange={e => setSideQuestion(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); askSidePanel(); } }}
+                placeholder="Escribe tu pregunta... (Enter para enviar)"
+                style={{ width: "100%", minHeight: 60, padding: S.sm, border: `1px solid ${C.border}`, background: C.white, color: C.text, fontSize: T.sm, fontFamily: T.mono, resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.6 }}
+              />
+              <button
+                onClick={askSidePanel}
+                disabled={sideLoading || !sideQuestion.trim()}
+                style={{ ...btnPrimary(sideLoading || !sideQuestion.trim()), width: "100%", padding: `${S.sm}px`, marginTop: S.xs, fontSize: T.xs, letterSpacing: T.wide }}
+              >
+                {sideLoading ? "pensando..." : "Enviar ↗"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── PYTHON TERMINAL ── */}
+        {showTerminal && (
+          <div style={{ position: "fixed", left: 0, top: 0, height: "100vh", width: 340, background: "#1E1E1E", border: `1px solid ${C.gold}`, boxShadow: `3px 0 12px rgba(0,0,0,0.3)`, zIndex: 400, display: "flex", flexDirection: "column" }}>
+            <div style={{ background: C.burgundy, padding: `${S.md}px ${S.lg}px`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+              <div>
+                <div style={{ color: C.gold, fontSize: T.sm, fontFamily: T.mono, fontWeight: T.bold, letterSpacing: T.wide }}>Python Terminal</div>
+                <div style={{ ...label(), color: pyodideReady ? "rgba(100,200,100,0.8)" : "rgba(200,151,31,0.5)", fontSize: 8 }}>
+                  {pyodideReady ? "● listo" : "● cargando Python..."}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: S.sm, alignItems: "center" }}>
+                {terminalOutput.length > 0 && <button onClick={() => setTerminalOutput([])} style={{ background: "none", border: `1px solid rgba(200,151,31,0.3)`, color: "rgba(200,151,31,0.6)", fontSize: T.xs, padding: `2px ${S.sm}px`, cursor: "pointer", fontFamily: T.mono, textTransform: "uppercase" }}>Limpiar</button>}
+                <button onClick={() => setShowTerminal(false)} style={{ background: "none", border: "none", color: C.gold, cursor: "pointer", fontSize: 16 }}>✕</button>
+              </div>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: S.md, fontFamily: T.mono, fontSize: T.sm }}>
+              {terminalOutput.length === 0 && (
+                <div style={{ color: "#666", fontSize: T.xs, lineHeight: 1.8 }}>
+                  {pyodideReady ? ">>> Python listo. Escribe código abajo." : "Cargando Python en el browser..."}
+                </div>
+              )}
+              {terminalOutput.map((line, i) => (
+                <div key={i} style={{ marginBottom: S.xs }}>
+                  {line.type === "input" && (
+                    <div style={{ color: "#569CD6" }}>
+                      <span style={{ color: "#666" }}>{">>> "}</span>
+                      {line.text}
+                    </div>
+                  )}
+                  {line.type === "output" && <div style={{ color: "#D4D4D4", whiteSpace: "pre-wrap" }}>{line.text}</div>}
+                  {line.type === "error" && <div style={{ color: "#F44747", whiteSpace: "pre-wrap" }}>{line.text}</div>}
+                </div>
+              ))}
+              <div ref={terminalBottomRef} />
+            </div>
+            <div style={{ padding: S.md, borderTop: `1px solid #333`, flexShrink: 0 }}>
+              <textarea
+                value={terminalCode}
+                onChange={e => setTerminalCode(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); runPython(); }
+                  if (e.key === "Tab") { e.preventDefault(); const s = e.target.selectionStart; setTerminalCode(c => c.substring(0, s) + "    " + c.substring(e.target.selectionEnd)); setTimeout(() => { e.target.selectionStart = e.target.selectionEnd = s + 4; }, 0); }
+                }}
+                placeholder={">>> escribe Python aquí
+    Shift+Enter para nueva línea
+    Enter para correr"}
+                disabled={!pyodideReady || terminalLoading}
+                style={{ width: "100%", minHeight: 80, padding: S.sm, border: `1px solid #444`, background: "#2D2D2D", color: "#D4D4D4", fontSize: T.sm, fontFamily: T.mono, resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.6 }}
+              />
+              <button
+                onClick={runPython}
+                disabled={!pyodideReady || terminalLoading || !terminalCode.trim()}
+                style={{ ...btnPrimary(!pyodideReady || terminalLoading || !terminalCode.trim()), width: "100%", padding: `${S.sm}px`, marginTop: S.xs, fontSize: T.xs, letterSpacing: T.wide }}
+              >
+                {!pyodideReady ? "cargando Python..." : terminalLoading ? "corriendo..." : "▶ Correr"}
+              </button>
+            </div>
           </div>
         )}
 
