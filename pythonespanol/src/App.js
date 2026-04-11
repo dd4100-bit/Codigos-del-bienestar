@@ -290,17 +290,26 @@ export default function App() {
     setHistorial(prev => [entry, ...prev].slice(0, 10));
   }
 
-  function handleTextSelection() {
-    const sel = window.getSelection();
-    if (!sel || sel.toString().trim().length < 3) return;
-    const text = sel.toString().trim();
-    const range = sel.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
-    setSelection(text);
-    setSelectionPos({ x: rect.left + rect.width / 2, y: rect.top + window.scrollY - 10 });
-    setSelectionNote("");
-    setShowSelectionPopup(true);
-  }
+  useEffect(() => {
+    function handleTextSelection() {
+      const sel = window.getSelection();
+      if (!sel || sel.toString().trim().length < 3) {
+        return;
+      }
+      const text = sel.toString().trim();
+      try {
+        const range = sel.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) return;
+        setSelection(text);
+        setSelectionPos({ x: rect.left + rect.width / 2, y: rect.top + window.scrollY - 10 });
+        setSelectionNote("");
+        setShowSelectionPopup(true);
+      } catch {}
+    }
+    document.addEventListener("mouseup", handleTextSelection);
+    return () => document.removeEventListener("mouseup", handleTextSelection);
+  }, []);
 
   async function explainSelection() {
     if (!selection) return;
@@ -732,7 +741,7 @@ export default function App() {
         )}
 
         {response && (
-          <div ref={responseRef} onMouseUp={handleTextSelection} style={{ border: `1px solid ${C.burgundy}`, animation: "fadeIn 0.4s ease", boxShadow: `3px 3px 0 ${C.burgundy}`, position: "relative" }}>
+          <div ref={responseRef} style={{ border: `1px solid ${C.burgundy}`, animation: "fadeIn 0.4s ease", boxShadow: `3px 3px 0 ${C.burgundy}`, position: "relative" }}>
             <div style={{ borderBottom: `1px solid ${C.burgundy}`, padding: `${S.md}px ${S.xl}px`, display: "flex", alignItems: "center", justifyContent: "space-between", background: C.burgundy }}>
               <div>
                 <div style={{ fontWeight: T.bold, fontSize: T.sm, color: C.gold, letterSpacing: T.wide, textTransform: "uppercase", fontFamily: T.sans }}>El Profesor</div>
