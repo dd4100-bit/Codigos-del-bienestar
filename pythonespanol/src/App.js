@@ -291,11 +291,22 @@ export default function App() {
   }
 
   useEffect(() => {
-    function handleTextSelection() {
-      const sel = window.getSelection();
-      if (!sel || sel.toString().trim().length < 3) {
+    function handleTextSelection(e) {
+      // Case 1: textarea selection
+      if (e.target.tagName === "TEXTAREA") {
+        const ta = e.target;
+        const text = ta.value.substring(ta.selectionStart, ta.selectionEnd).trim();
+        if (text.length < 3) return;
+        const rect = ta.getBoundingClientRect();
+        setSelection(text);
+        setSelectionPos({ x: rect.left + rect.width / 2, y: rect.top + window.scrollY - 10 });
+        setSelectionNote("");
+        setShowSelectionPopup(true);
         return;
       }
+      // Case 2: normal DOM selection
+      const sel = window.getSelection();
+      if (!sel || sel.toString().trim().length < 3) return;
       const text = sel.toString().trim();
       try {
         const range = sel.getRangeAt(0);
