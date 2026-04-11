@@ -862,9 +862,7 @@ export default function App() {
                   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); runPython(); }
                   if (e.key === "Tab") { e.preventDefault(); const s = e.target.selectionStart; setTerminalCode(c => c.substring(0, s) + "    " + c.substring(e.target.selectionEnd)); setTimeout(() => { e.target.selectionStart = e.target.selectionEnd = s + 4; }, 0); }
                 }}
-                placeholder={">>> escribe Python aquí
-    Shift+Enter para nueva línea
-    Enter para correr"}
+                placeholder={">>> escribe Python aquí\n    Shift+Enter para nueva línea\n    Enter para correr"}
                 disabled={!pyodideReady || terminalLoading}
                 style={{ width: "100%", minHeight: 80, padding: S.sm, border: `1px solid #444`, background: "#2D2D2D", color: "#D4D4D4", fontSize: T.sm, fontFamily: T.mono, resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.6 }}
               />
