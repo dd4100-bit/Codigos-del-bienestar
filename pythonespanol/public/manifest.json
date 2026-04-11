@@ -1,0 +1,40 @@
+{
+  "name": "El Profesor — Códigos del Bienestar",
+  "short_name": "El Profesor",
+  "description": "Debuggea tu código Python en español con IA. Gratis. Para developers hispanohablantes.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#6B1223",
+  "theme_color": "#6B1223",
+  "lang": "es",
+  "categories": ["education", "developer tools"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Code Combat",
+      "url": "/?game=1",
+      "description": "Juego RPG de Python"
+    }
+  ]
+}

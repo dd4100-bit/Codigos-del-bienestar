@@ -66,10 +66,11 @@ const ENEMIES = [
   },
 ];
 
-const XP_THRESHOLDS = [0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 9999];
-const LS_STATS = "codecombat_stats";
-const LS_HIST  = "elprofesor_historial";
-const API_KEY  = process.env.REACT_APP_ANTHROPIC_API_KEY;
+const XP_THRESHOLDS  = [0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 9999];
+const LS_STATS       = "codecombat_stats";
+const LS_HIST        = "elprofesor_historial";
+const LS_OFFLINE_Q   = "offline_quizzes";
+const API_KEY        = process.env.REACT_APP_ANTHROPIC_API_KEY;
 
 const FALLBACKS = {
   SyntaxError: {
@@ -183,10 +184,42 @@ function updateStreak(stats) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// OFFLINE QUIZ CACHE
+// ═══════════════════════════════════════════════════════════════════════════
+
+function getOfflineQuestion(errorType) {
+  try {
+    const data = JSON.parse(localStorage.getItem(LS_OFFLINE_Q));
+    if (!data?.byErrorType) return null;
+    // Try exact match first; fall back to any available question
+    const pool =
+      (data.byErrorType[errorType]?.length ? data.byErrorType[errorType] : null) ??
+      Object.values(data.byErrorType).flat();
+    if (!pool?.length) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
+  } catch { return null; }
+}
+
+function getOfflineQuizInfo() {
+  try {
+    const data = JSON.parse(localStorage.getItem(LS_OFFLINE_Q));
+    if (!data) return null;
+    return { total: data.totalQuestions ?? 0, saved_at: data.saved_at };
+  } catch { return null; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // API — QUESTION GENERATION
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function generateQuestion(errorType, historial) {
+  // If offline, use the local quiz cache (prepared with Study Offline)
+  if (!navigator.onLine) {
+    const q = getOfflineQuestion(errorType);
+    if (q) return q;
+    throw new Error("offline_no_cache");
+  }
+
   const ctx = historial.length
     ? `Historial del estudiante (últimas sesiones): ${historial.slice(0, 3).map(h => h.resumen).join(" | ")}`
     : "El estudiante está comenzando a aprender Python.";
@@ -531,7 +564,7 @@ function XPBar({ xp }) {
 // START SCREEN
 // ═══════════════════════════════════════════════════════════════════════════
 
-function StartScreen({ stats, enemyIndex, streak, onStart }) {
+function StartScreen({ stats, enemyIndex, streak, isOffline, offlineInfo, onStart }) {
   const enemy   = ENEMIES[enemyIndex];
   const level   = getLevelFromXP(stats.xp);
   const { pct } = getXPProgress(stats.xp);
@@ -636,8 +669,28 @@ function StartScreen({ stats, enemyIndex, streak, onStart }) {
         ⚔️ ¡Batallar!
       </button>
 
-      <div style={{ marginTop: S.xl, fontSize: T.xs, color: "#555", fontFamily: T.mono, letterSpacing: 2, textTransform: "uppercase" }}>
-        3 vidas · preguntas con IA · puro Python
+      {/* Offline / online indicator */}
+      <div style={{ marginTop: S.xl, display: "flex", flexDirection: "column", alignItems: "center", gap: S.sm }}>
+        {isOffline ? (
+          <div style={{ display: "flex", alignItems: "center", gap: S.sm, background: "rgba(0,0,0,0.5)", border: "1px solid #FF6D00", borderRadius: 20, padding: `${S.xs}px ${S.md}px` }}>
+            <span style={{ fontSize: 10, color: "#FF6D00" }}>●</span>
+            <span style={{ fontSize: T.xs, color: "#FF8A50", fontFamily: T.mono, letterSpacing: 1 }}>
+              SIN CONEXIÓN — {offlineInfo ? `${offlineInfo.total} preguntas offline disponibles` : "usando preguntas incorporadas"}
+            </span>
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: S.sm }}>
+            <span style={{ fontSize: 10, color: "#4CAF50" }}>●</span>
+            <span style={{ fontSize: T.xs, color: "#555", fontFamily: T.mono, letterSpacing: 2, textTransform: "uppercase" }}>
+              3 vidas · preguntas con IA · puro Python
+            </span>
+          </div>
+        )}
+        {!isOffline && offlineInfo && (
+          <div style={{ fontSize: T.xs, color: "#444", fontFamily: T.mono }}>
+            📥 {offlineInfo.total} preguntas offline guardadas
+          </div>
+        )}
       </div>
     </div>
   );
@@ -647,7 +700,7 @@ function StartScreen({ stats, enemyIndex, streak, onStart }) {
 // LOADING SCREEN
 // ═══════════════════════════════════════════════════════════════════════════
 
-function LoadingScreen({ enemy }) {
+function LoadingScreen({ enemy, isOffline }) {
   const [dots, setDots] = useState(".");
   useEffect(() => {
     const id = setInterval(() => setDots(d => d.length >= 3 ? "." : d + "."), 400);
@@ -658,10 +711,10 @@ function LoadingScreen({ enemy }) {
       <EnemySprite enemy={enemy} anim="idle"/>
       <div style={{ textAlign: "center" }}>
         <div style={{ fontSize: T.md, color: C.gold, fontFamily: T.mono, letterSpacing: 2 }}>
-          Generando pregunta{dots}
+          {isOffline ? "Cargando pregunta offline" : `Generando pregunta${dots}`}
         </div>
         <div style={{ fontSize: T.sm, color: "#666", fontFamily: T.sans, marginTop: S.sm }}>
-          Claude está preparando el desafío
+          {isOffline ? "Usando quizzes guardados" : "Claude está preparando el desafío"}
         </div>
       </div>
       <div style={{ display: "flex", gap: 10 }}>
@@ -677,11 +730,21 @@ function LoadingScreen({ enemy }) {
 // BATTLE SCREEN
 // ═══════════════════════════════════════════════════════════════════════════
 
-function BattleScreen({ enemy, enemyHP, hearts, question, selectedOption, isCorrect, anim, taunt, stats, onAnswer, onContinue }) {
+function BattleScreen({ enemy, enemyHP, hearts, question, selectedOption, isCorrect, anim, taunt, stats, isOffline, onAnswer, onContinue }) {
   const showResult = selectedOption !== null;
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: `linear-gradient(180deg, #0D0005 0%, #160010 50%, #060D02 100%)` }}>
+
+      {/* Offline banner */}
+      {isOffline && (
+        <div style={{ background: "#2C1600", borderBottom: "1px solid #FF6D00", padding: `3px ${S.lg}px`, display: "flex", alignItems: "center", gap: S.sm }}>
+          <span style={{ fontSize: 9, color: "#FF6D00" }}>●</span>
+          <span style={{ fontSize: T.xs, color: "#FF8A50", fontFamily: T.mono, letterSpacing: 1 }}>
+            MODO OFFLINE — preguntas guardadas
+          </span>
+        </div>
+      )}
 
       {/* Top bar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: `${S.md}px ${S.xl}px`, background: "rgba(0,0,0,0.6)", borderBottom: `1px solid ${C.gold}22` }}>
@@ -921,17 +984,19 @@ export default function Game({ onClose }) {
   const [stats, setStats] = useState(() => loadStats());
 
   // ── Session ─────────────────────────────────────────────────────────────
-  const [phase, setPhase] = useState("start"); // start | loading | battle | victory | gameover
-  const [enemyIndex, setEnemyIndex] = useState(0);
-  const [enemyHP, setEnemyHP] = useState(0);
-  const [hearts, setHearts] = useState(3);
-  const [question, setQuestion] = useState(null);
+  const [phase, setPhase]               = useState("start"); // start | loading | battle | victory | gameover
+  const [enemyIndex, setEnemyIndex]     = useState(0);
+  const [enemyHP, setEnemyHP]           = useState(0);
+  const [hearts, setHearts]             = useState(3);
+  const [question, setQuestion]         = useState(null);
   const [selectedOption, setSelectedOption] = useState(null);
-  const [isCorrect, setIsCorrect] = useState(null);
-  const [anim, setAnim] = useState("idle");
-  const [taunt, setTaunt] = useState(null);
-  const [prevXP, setPrevXP] = useState(0);
-  const [xpGain, setXpGain] = useState(0);
+  const [isCorrect, setIsCorrect]       = useState(null);
+  const [anim, setAnim]                 = useState("idle");
+  const [taunt, setTaunt]               = useState(null);
+  const [prevXP, setPrevXP]             = useState(0);
+  const [xpGain, setXpGain]             = useState(0);
+  const [isOffline, setIsOffline]       = useState(!navigator.onLine);
+  const [offlineInfo]                   = useState(() => getOfflineQuizInfo());
 
   const enemy = ENEMIES[enemyIndex];
 
@@ -959,17 +1024,22 @@ export default function Game({ onClose }) {
     setIsCorrect(null);
     setTaunt(null);
     setAnim("idle");
+    setIsOffline(!navigator.onLine);
 
     try {
       const historial = loadHistorial();
       const q = await generateQuestion(enemy.errorType, historial);
       setQuestion(q);
-    } catch {
-      setQuestion(FALLBACKS[enemy.errorType] ?? FALLBACKS.SyntaxError);
+    } catch (err) {
+      // offline_no_cache: no internet AND no saved quizzes → hard fallback
+      // For any other error: try offline cache before falling back
+      const offlineQ = err.message !== "offline_no_cache"
+        ? getOfflineQuestion(enemy.errorType)
+        : null;
+      setQuestion(offlineQ ?? FALLBACKS[enemy.errorType] ?? FALLBACKS.SyntaxError);
     }
 
     setPhase("battle");
-    // Show enemy taunt briefly
     setTaunt(enemy.taunt);
     setTimeout(() => setTaunt(null), 2600);
   }
@@ -1075,8 +1145,8 @@ export default function Game({ onClose }) {
         >✕</button>
       )}
 
-      {phase === "start"   && <StartScreen   stats={stats} enemyIndex={enemyIndex} streak={streak} onStart={startBattle}/>}
-      {phase === "loading" && <LoadingScreen  enemy={enemy}/>}
+      {phase === "start"   && <StartScreen   stats={stats} enemyIndex={enemyIndex} streak={streak} isOffline={isOffline} offlineInfo={offlineInfo} onStart={startBattle}/>}
+      {phase === "loading" && <LoadingScreen  enemy={enemy} isOffline={isOffline}/>}
       {phase === "battle"  && question && (
         <BattleScreen
           enemy={enemy}
@@ -1088,6 +1158,7 @@ export default function Game({ onClose }) {
           anim={anim}
           taunt={taunt}
           stats={stats}
+          isOffline={isOffline}
           onAnswer={handleAnswer}
           onContinue={handleContinue}
         />

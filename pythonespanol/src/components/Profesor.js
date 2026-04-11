@@ -13,6 +13,13 @@ export default function Profesor({ code, setCode, images, setImages, runPython, 
   const [historial, setHistorial] = useState([]);
   const [showHistorial, setShowHistorial] = useState(false);
 
+  // ── Offline quiz state ──────────────────────────────────────────────────
+  const [offlineModal, setOfflineModal]       = useState(false);
+  const [selectedIds, setSelectedIds]         = useState([]);
+  const [offlineProgress, setOfflineProgress] = useState(null); // { current, total, label }
+  const [offlineDone, setOfflineDone]         = useState(false);
+  const [offlineCount, setOfflineCount]       = useState(0);
+
   const fileInputRef = useRef(null);
   const responseRef = useRef(null);
   const intervalRef = useRef(null);
@@ -43,6 +50,114 @@ export default function Profesor({ code, setCode, images, setImages, runPython, 
       resumen: respuesta.substring(0, 120) + "...",
     };
     setHistorial(prev => [entry, ...prev].slice(0, 10));
+  }
+
+  // ── Offline quiz generation ─────────────────────────────────────────────
+
+  function closeOfflineModal() {
+    if (offlineProgress) return;      // don't close while generating
+    setOfflineModal(false);
+    setSelectedIds([]);
+    setOfflineDone(false);
+    setOfflineProgress(null);
+  }
+
+  function toggleEntry(id) {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  }
+
+  async function generateOfflineQuestionsForEntry(entry) {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2200,
+        system: `Eres un generador de preguntas de quiz para Code Combat, un juego educativo de Python en español. Generas preguntas de opción múltiple personalizadas al código del estudiante. Responde SOLO con un array JSON válido, sin texto adicional ni markdown.`,
+        messages: [{
+          role: "user",
+          content: `El estudiante tuvo esta sesión con El Profesor:
+Código: ${entry.codigo}
+Análisis: ${entry.resumen}
+
+Genera exactamente 5 preguntas de quiz Python relacionadas con los errores que aparecen en esta sesión.
+Para cada pregunta elige el errorType más adecuado de: SyntaxError, NameError, IndexError, TypeError, IndentationError, KeyError, AttributeError, ImportError.
+
+Responde SOLO con este JSON array (sin markdown, sin texto adicional):
+[
+  {
+    "errorType": "SyntaxError",
+    "code": "código Python de 3-7 líneas (usa \\n para saltos)",
+    "question": "pregunta breve en español",
+    "options": ["opción A", "opción B", "opción C", "opción D"],
+    "correct": 0,
+    "explanation": "1-2 oraciones explicando la respuesta"
+  }
+]
+"correct" es el índice 0-3 de la opción correcta.`,
+        }],
+      }),
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const text = data.content?.[0]?.text ?? "";
+    const match = text.match(/\[[\s\S]*\]/);
+    if (!match) throw new Error("No JSON array");
+    const questions = JSON.parse(match[0]);
+    // Validate shape
+    if (!Array.isArray(questions) || !questions.length) throw new Error("Empty array");
+    return questions.filter(q =>
+      q.errorType && q.code && q.question &&
+      Array.isArray(q.options) && q.options.length === 4 &&
+      typeof q.correct === "number"
+    );
+  }
+
+  async function prepareOfflineQuizzes() {
+    const entries = historial.filter(e => selectedIds.includes(e.id));
+    if (!entries.length) return;
+
+    const byErrorType = {};
+
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      setOfflineProgress({
+        current: i + 1,
+        total:   entries.length,
+        label:   entry.codigo.substring(0, 45) + (entry.codigo.length > 45 ? "…" : ""),
+      });
+
+      try {
+        const questions = await generateOfflineQuestionsForEntry(entry);
+        questions.forEach(q => {
+          if (!byErrorType[q.errorType]) byErrorType[q.errorType] = [];
+          byErrorType[q.errorType].push(q);
+        });
+      } catch {
+        // Skip failed entries — keep going
+      }
+    }
+
+    const total = Object.values(byErrorType).flat().length;
+    try {
+      localStorage.setItem("offline_quizzes", JSON.stringify({
+        saved_at:     new Date().toISOString(),
+        byErrorType,
+        totalQuestions: total,
+      }));
+    } catch {/* localStorage full — still show done */}
+
+    setOfflineCount(total);
+    setOfflineProgress(null);
+    setOfflineDone(true);
   }
 
   function readImageFile(file) {
@@ -235,11 +350,160 @@ export default function Profesor({ code, setCode, images, setImages, runPython, 
           </div>
         )}
 
+        {/* OFFLINE MODAL */}
+        {offlineModal && (
+          <div
+            onClick={closeOfflineModal}
+            style={{ position: "fixed", inset: 0, background: "rgba(26,16,8,0.75)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: S.xl }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{ background: C.cream, border: `2px solid ${C.olive}`, boxShadow: `4px 4px 0 ${C.olive}`, maxWidth: 520, width: "100%", maxHeight: "85vh", display: "flex", flexDirection: "column", animation: "fadeIn 0.2s ease" }}
+            >
+              {/* Header */}
+              <div style={{ background: C.olive, padding: `${S.md}px ${S.xl}px`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+                <div>
+                  <div style={{ color: C.cream, fontSize: T.sm, fontFamily: T.sans, fontWeight: T.bold, letterSpacing: T.wide, textTransform: "uppercase" }}>📥 Study Offline</div>
+                  <div style={{ fontSize: T.xs, color: "rgba(245,240,232,0.6)", letterSpacing: T.wide, fontFamily: T.sans, textTransform: "uppercase" }}>Quizzes para Code Combat sin internet</div>
+                </div>
+                {!offlineProgress && (
+                  <button onClick={closeOfflineModal} style={{ background: "none", border: "none", color: C.cream, cursor: "pointer", fontSize: 18, lineHeight: 1 }}>✕</button>
+                )}
+              </div>
+
+              {/* Body */}
+              <div style={{ flex: 1, overflowY: "auto", padding: S.xl }}>
+
+                {/* — Generating progress — */}
+                {offlineProgress && (
+                  <div style={{ textAlign: "center", padding: `${S.xl}px 0` }}>
+                    <div style={{ fontSize: T.md, fontFamily: T.sans, fontWeight: T.bold, color: C.olive, marginBottom: S.lg }}>
+                      Generando quizzes…
+                    </div>
+                    {/* Progress bar */}
+                    <div style={{ height: 10, background: C.creamDark, borderRadius: 5, overflow: "hidden", marginBottom: S.md, border: `1px solid ${C.border}` }}>
+                      <div style={{ height: "100%", width: `${(offlineProgress.current / offlineProgress.total) * 100}%`, background: `linear-gradient(90deg, ${C.olive}, #6A9A50)`, borderRadius: 5, transition: "width 0.5s ease" }}/>
+                    </div>
+                    <div style={{ fontSize: T.sm, color: C.textMid, fontFamily: T.mono, marginBottom: S.sm }}>
+                      {offlineProgress.current} / {offlineProgress.total} sesiones
+                    </div>
+                    <div style={{ fontSize: T.sm, color: C.textLight, fontFamily: T.mono, fontStyle: "italic" }}>
+                      "{offlineProgress.label}"
+                    </div>
+                    <div style={{ marginTop: S.lg, fontSize: T.xs, color: C.textLight, fontFamily: T.sans }}>
+                      No cierres esta ventana…
+                    </div>
+                  </div>
+                )}
+
+                {/* — Done — */}
+                {offlineDone && !offlineProgress && (
+                  <div style={{ textAlign: "center", padding: `${S.xl}px 0` }}>
+                    <div style={{ fontSize: 48, marginBottom: S.md }}>✅</div>
+                    <div style={{ fontSize: T.lg, fontFamily: T.serif, fontWeight: T.bold, color: C.olive, marginBottom: S.sm }}>
+                      ¡Quizzes listos!
+                    </div>
+                    <div style={{ fontSize: T.base, color: C.textMid, fontFamily: T.sans, lineHeight: 1.7, marginBottom: S.xl }}>
+                      <strong style={{ color: C.burgundy }}>{offlineCount} preguntas</strong> guardadas en tu dispositivo.<br/>
+                      Puedes jugar Code Combat sin internet.
+                    </div>
+                    <button
+                      onClick={closeOfflineModal}
+                      style={{ ...btnPrimary(false), padding: `${S.md}px ${S.xxl}px`, boxShadow: `2px 2px 0 ${C.text}` }}
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+                )}
+
+                {/* — Selection — */}
+                {!offlineProgress && !offlineDone && (
+                  <>
+                    <p style={{ marginTop: 0, fontSize: T.base, color: C.textMid, fontFamily: T.sans, lineHeight: 1.7 }}>
+                      Selecciona las sesiones para las que quieres generar 5 preguntas de quiz. Solo necesitas internet <em>ahora</em>; después juegas Code Combat sin conexión.
+                    </p>
+
+                    {historial.length === 0 ? (
+                      <div style={{ textAlign: "center", padding: `${S.xl}px 0`, color: C.textLight, fontFamily: T.mono, fontSize: T.base, lineHeight: 1.8 }}>
+                        No tienes historial aún.<br/>
+                        Usa El Profesor para debuggear código<br/>y vuelve aquí.
+                      </div>
+                    ) : (
+                      <>
+                        {/* Select all / none */}
+                        <div style={{ display: "flex", gap: S.sm, marginBottom: S.md }}>
+                          <button
+                            onClick={() => setSelectedIds(historial.map(e => e.id))}
+                            style={{ ...btnGhost(), fontSize: T.xs, padding: `${S.xs}px ${S.md}px` }}
+                          >
+                            Seleccionar todo
+                          </button>
+                          <button
+                            onClick={() => setSelectedIds([])}
+                            style={{ ...btnGhost(), fontSize: T.xs, padding: `${S.xs}px ${S.md}px` }}
+                          >
+                            Limpiar
+                          </button>
+                          <span style={{ marginLeft: "auto", fontSize: T.xs, color: C.textLight, fontFamily: T.mono, alignSelf: "center" }}>
+                            {selectedIds.length} seleccionadas
+                          </span>
+                        </div>
+
+                        {/* Checkboxes */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: S.sm, marginBottom: S.xl }}>
+                          {historial.map(entry => {
+                            const checked = selectedIds.includes(entry.id);
+                            return (
+                              <label
+                                key={entry.id}
+                                style={{ display: "flex", gap: S.md, alignItems: "flex-start", cursor: "pointer", padding: S.md, border: `1px solid ${checked ? C.olive : C.border}`, background: checked ? `${C.olive}11` : C.white, transition: "all 0.15s" }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => toggleEntry(entry.id)}
+                                  style={{ marginTop: 2, accentColor: C.olive, width: 16, height: 16, flexShrink: 0, cursor: "pointer" }}
+                                />
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: T.xs, color: C.textLight, fontFamily: T.sans, marginBottom: 2 }}>{entry.fecha}</div>
+                                  <div style={{ fontSize: T.sm, color: C.text, fontFamily: T.mono, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.codigo}</div>
+                                  <div style={{ fontSize: T.xs, color: C.burgundy, fontStyle: "italic", lineHeight: 1.4 }}>{entry.resumen}</div>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+
+                        {/* Confirm */}
+                        <button
+                          onClick={prepareOfflineQuizzes}
+                          disabled={!selectedIds.length}
+                          style={{ ...btnPrimary(!selectedIds.length), width: "100%", padding: `${S.lg}px`, boxShadow: selectedIds.length ? `2px 2px 0 ${C.text}` : "none", background: selectedIds.length ? C.olive : C.creamDark, borderColor: selectedIds.length ? C.olive : C.border, letterSpacing: T.wider }}
+                        >
+                          {selectedIds.length
+                            ? `Preparar ${selectedIds.length} sesión${selectedIds.length > 1 ? "es" : ""} →`
+                            : "Selecciona al menos una sesión"}
+                        </button>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* QUICK ACTION BUTTONS */}
         <div style={{ display: "flex", gap: S.md, marginBottom: S.xxl, flexWrap: "wrap", alignItems: "center" }}>
           <button onClick={() => setModal("sirve")} style={btnSecondary()}>¿Para qué sirve?</button>
           <button onClick={() => setModal("usar")} style={btnSecondary()}>¿Cómo usar al Profesor?</button>
           <button onClick={() => setModal("ideas")} style={btnGhost()}>Ideas para El Profesor</button>
+          <button
+            onClick={() => { setOfflineDone(false); setSelectedIds([]); setOfflineProgress(null); setOfflineModal(true); }}
+            style={{ ...btnGhost(), borderColor: C.olive, color: C.olive }}
+          >
+            📥 Study Offline
+          </button>
         </div>
 
         {/* EXAMPLES */}
