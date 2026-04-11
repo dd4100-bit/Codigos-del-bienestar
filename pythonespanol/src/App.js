@@ -292,18 +292,21 @@ export default function App() {
 
   useEffect(() => {
     function handleTextSelection(e) {
+      const mouseX = e.clientX;
+      const mouseY = e.clientY;
+
       // Case 1: textarea selection
       if (e.target.tagName === "TEXTAREA") {
         const ta = e.target;
         const text = ta.value.substring(ta.selectionStart, ta.selectionEnd).trim();
         if (text.length < 3) return;
-        const rect = ta.getBoundingClientRect();
         setSelection(text);
-        setSelectionPos({ x: rect.left + rect.width / 2, y: rect.top - 10 });
+        setSelectionPos({ x: mouseX, y: mouseY - 40 });
         setSelectionNote("");
         setShowSelectionPopup(true);
         return;
       }
+
       // Case 2: normal DOM selection
       const sel = window.getSelection();
       if (!sel || sel.toString().trim().length < 3) return;
