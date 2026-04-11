@@ -253,14 +253,11 @@ export default function App() {
   const [chatHistory, setChatHistory] = useState([]); // [{role, content}]
   const chatBottomRef = useRef(null);
 
-  // Python terminal
-  const [terminalCode, setTerminalCode] = useState("");
+  // Python terminal (inline)
   const [terminalOutput, setTerminalOutput] = useState([]);
   const [terminalLoading, setTerminalLoading] = useState(false);
   const [pyodideReady, setPyodideReady] = useState(false);
-  const [showTerminal, setShowTerminal] = useState(false);
   const pyodideRef = useRef(null);
-  const terminalBottomRef = useRef(null);
   const [modal, setModal] = useState(null);
   const [historial, setHistorial] = useState([]);
   const [showHistorial, setShowHistorial] = useState(false);
@@ -309,11 +306,6 @@ export default function App() {
   useEffect(() => {
     if (chatBottomRef.current) chatBottomRef.current.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
-
-  // Scroll terminal to bottom
-  useEffect(() => {
-    if (terminalBottomRef.current) terminalBottomRef.current.scrollIntoView({ behavior: "smooth" });
-  }, [terminalOutput]);
 
   function saveToHistorial(codigo, respuesta) {
     const entry = {
@@ -391,21 +383,18 @@ export default function App() {
   }
 
   async function runPython() {
-    if (!terminalCode.trim() || !pyodideReady) return;
+    if (!code.trim() || !pyodideReady) return;
     setTerminalLoading(true);
+    setTerminalOutput([]);
     try {
       let output = "";
       pyodideRef.current.setStdout({ batched: (text) => { output += text + "\n"; } });
       pyodideRef.current.setStderr({ batched: (text) => { output += text + "\n"; } });
-      await pyodideRef.current.runPythonAsync(terminalCode);
-      setTerminalOutput(prev => [...prev, {
-        type: output.trim() ? "output" : "silent",
-        text: output.trim() || ""
-      }]);
+      await pyodideRef.current.runPythonAsync(code);
+      setTerminalOutput(output.trim() ? [{ type: "output", text: output.trim() }] : [{ type: "silent", text: "(sin output)" }]);
     } catch (err) {
-      setTerminalOutput(prev => [...prev, { type: "error", text: err.message }]);
+      setTerminalOutput([{ type: "error", text: err.message }]);
     }
-    setTerminalCode("");
     setTerminalLoading(false);
   }
 
@@ -740,27 +729,49 @@ export default function App() {
           )}
         </div>
 
-        <button
-          onClick={askProfe}
-          disabled={isDisabled}
-          style={{ ...btnPrimary(isDisabled), width: "100%", padding: `${S.lg}px`, marginBottom: S.xxxl, boxShadow: isDisabled ? "none" : `2px 2px 0 ${C.text}`, letterSpacing: T.widest }}
-        >
-          {loading ? `... ${LOADING_FRASES[fraseIdx]}` : "Iniciar Debug"}
-        </button>
+        <div style={{ display: "flex", gap: S.sm, marginBottom: S.xxxl }}>
+          <button
+            onClick={askProfe}
+            disabled={isDisabled}
+            style={{ ...btnPrimary(isDisabled), flex: 3, padding: `${S.lg}px`, boxShadow: isDisabled ? "none" : `2px 2px 0 ${C.text}`, letterSpacing: T.widest }}
+          >
+            {loading ? `... ${LOADING_FRASES[fraseIdx]}` : "Iniciar Debug"}
+          </button>
+          <button
+            onClick={runPython}
+            disabled={!pyodideReady || terminalLoading || (!code.trim() && !images.length)}
+            style={{ ...btnPrimary(!pyodideReady || terminalLoading || (!code.trim() && !images.length)), flex: 1, padding: `${S.lg}px`, boxShadow: (!pyodideReady || terminalLoading || (!code.trim() && !images.length)) ? "none" : `2px 2px 0 ${C.text}`, letterSpacing: T.widest, background: (!pyodideReady || terminalLoading || (!code.trim() && !images.length)) ? C.creamDark : C.olive }}
+          >
+            {!pyodideReady ? "..." : terminalLoading ? "▶ corriendo" : "▶ Correr"}
+          </button>
+        </div>
+
+        {/* PYTHON OUTPUT */}
+        {terminalOutput.length > 0 && (
+          <div style={{ marginBottom: S.xxxl, border: `1px solid ${C.olive}`, boxShadow: `2px 2px 0 ${C.olive}` }}>
+            <div style={{ background: C.olive, padding: `${S.sm}px ${S.lg}px`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ ...label(), color: C.gold, fontSize: T.xs, letterSpacing: T.wider }}>🐍 Output</span>
+              <button onClick={() => setTerminalOutput([])} style={{ background: "none", border: "none", color: C.gold, cursor: "pointer", fontSize: T.xs, fontFamily: T.sans, textTransform: "uppercase", letterSpacing: T.wide }}>✕ Limpiar</button>
+            </div>
+            <div style={{ padding: S.lg, background: "#1E1E1E", fontFamily: T.mono, fontSize: T.base }}>
+              {terminalOutput.map((line, i) => (
+                <div key={i}>
+                  {line.type === "output" && <div style={{ color: "#D4D4D4", whiteSpace: "pre-wrap" }}>{line.text}</div>}
+                  {line.type === "error" && <div style={{ color: "#F44747", whiteSpace: "pre-wrap" }}>{line.text}</div>}
+                  {line.type === "silent" && <div style={{ color: "#666", fontStyle: "italic" }}>{line.text}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ── FLOATING BUTTONS LEFT SIDE ── */}
-        <div style={{ position: "fixed", left: 0, top: "50%", transform: "translateY(-50%)", zIndex: 500, display: "flex", flexDirection: "column", gap: 2 }}>
+        <div style={{ position: "fixed", left: 0, top: "50%", transform: "translateY(-50%)", zIndex: 500 }}>
           <button
-            onClick={() => { setShowSidePanel(p => !p); setShowTerminal(false); }}
+            onClick={() => setShowSidePanel(p => !p)}
             style={{ background: showSidePanel ? C.gold : C.burgundy, border: `1px solid ${C.gold}`, borderLeft: "none", color: showSidePanel ? C.burgundy : C.gold, padding: `${S.xl}px ${S.md}px`, cursor: "pointer", fontFamily: T.sans, fontSize: T.sm, fontWeight: T.bold, letterSpacing: T.wide, textTransform: "uppercase", writingMode: "vertical-rl", borderRadius: "0 6px 6px 0", boxShadow: `2px 2px 0 ${C.text}`, transition: "all 0.15s" }}
           >
             💬 Chat
-          </button>
-          <button
-            onClick={() => { setShowTerminal(p => !p); setShowSidePanel(false); }}
-            style={{ background: showTerminal ? C.gold : C.olive, border: `1px solid ${C.gold}`, borderLeft: "none", color: showTerminal ? C.burgundy : C.gold, padding: `${S.xl}px ${S.md}px`, cursor: "pointer", fontFamily: T.sans, fontSize: T.sm, fontWeight: T.bold, letterSpacing: T.wide, textTransform: "uppercase", writingMode: "vertical-rl", borderRadius: "0 6px 6px 0", boxShadow: `2px 2px 0 ${C.text}`, transition: "all 0.15s" }}
-          >
-            🐍 Python
           </button>
         </div>
 
@@ -818,57 +829,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ── PYTHON TERMINAL ── */}
-        {showTerminal && (
-          <div style={{ position: "fixed", left: 0, top: 0, height: "100vh", width: 340, background: "#1E1E1E", border: `1px solid ${C.gold}`, boxShadow: `3px 0 12px rgba(0,0,0,0.3)`, zIndex: 400, display: "flex", flexDirection: "column" }}>
-            <div style={{ background: C.burgundy, padding: `${S.md}px ${S.lg}px`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
-              <div>
-                <div style={{ color: C.gold, fontSize: T.sm, fontFamily: T.mono, fontWeight: T.bold, letterSpacing: T.wide }}>Python Terminal</div>
-                <div style={{ ...label(), color: pyodideReady ? "rgba(100,200,100,0.8)" : "rgba(200,151,31,0.5)", fontSize: 8 }}>
-                  {pyodideReady ? "● listo" : "● cargando Python..."}
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: S.sm, alignItems: "center" }}>
-                {terminalOutput.length > 0 && <button onClick={() => setTerminalOutput([])} style={{ background: "none", border: `1px solid rgba(200,151,31,0.3)`, color: "rgba(200,151,31,0.6)", fontSize: T.xs, padding: `2px ${S.sm}px`, cursor: "pointer", fontFamily: T.mono, textTransform: "uppercase" }}>Limpiar</button>}
-                <button onClick={() => setShowTerminal(false)} style={{ background: "none", border: "none", color: C.gold, cursor: "pointer", fontSize: 16 }}>✕</button>
-              </div>
-            </div>
-            <div style={{ flex: 1, overflowY: "auto", padding: S.md, fontFamily: T.mono, fontSize: T.sm }}>
-              {terminalOutput.length === 0 && (
-                <div style={{ color: "#666", fontSize: T.xs, lineHeight: 1.8 }}>
-                  {pyodideReady ? ">>> Python listo. Escribe código abajo." : "Cargando Python en el browser..."}
-                </div>
-              )}
-              {terminalOutput.map((line, i) => (
-                <div key={i} style={{ marginBottom: S.sm }}>
-                  {line.type === "output" && <div style={{ color: "#D4D4D4", whiteSpace: "pre-wrap", borderLeft: "2px solid #569CD6", paddingLeft: S.sm }}>{line.text}</div>}
-                  {line.type === "error" && <div style={{ color: "#F44747", whiteSpace: "pre-wrap", borderLeft: "2px solid #F44747", paddingLeft: S.sm }}>{line.text}</div>}
-                </div>
-              ))}
-              <div ref={terminalBottomRef} />
-            </div>
-            <div style={{ padding: S.md, borderTop: `1px solid #333`, flexShrink: 0 }}>
-              <textarea
-                value={terminalCode}
-                onChange={e => setTerminalCode(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); runPython(); }
-                  if (e.key === "Tab") { e.preventDefault(); const s = e.target.selectionStart; setTerminalCode(c => c.substring(0, s) + "    " + c.substring(e.target.selectionEnd)); setTimeout(() => { e.target.selectionStart = e.target.selectionEnd = s + 4; }, 0); }
-                }}
-                placeholder={">>> escribe Python aquí\n    Shift+Enter para nueva línea\n    Enter para correr"}
-                disabled={!pyodideReady || terminalLoading}
-                style={{ width: "100%", minHeight: 80, padding: S.sm, border: `1px solid #444`, background: "#2D2D2D", color: "#D4D4D4", fontSize: T.sm, fontFamily: T.mono, resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.6 }}
-              />
-              <button
-                onClick={runPython}
-                disabled={!pyodideReady || terminalLoading || !terminalCode.trim()}
-                style={{ ...btnPrimary(!pyodideReady || terminalLoading || !terminalCode.trim()), width: "100%", padding: `${S.sm}px`, marginTop: S.xs, fontSize: T.xs, letterSpacing: T.wide }}
-              >
-                {!pyodideReady ? "cargando Python..." : terminalLoading ? "corriendo..." : "▶ Correr"}
-              </button>
-            </div>
-          </div>
-        )}
 
         {response && (
           <div ref={responseRef} style={{ border: `1px solid ${C.burgundy}`, animation: "fadeIn 0.4s ease", boxShadow: `3px 3px 0 ${C.burgundy}`, position: "relative" }}>
