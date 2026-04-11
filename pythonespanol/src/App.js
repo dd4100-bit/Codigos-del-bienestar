@@ -253,6 +253,16 @@ export default function App() {
   const [chatHistory, setChatHistory] = useState([]); // [{role, content}]
   const chatBottomRef = useRef(null);
 
+  // Tutor mode
+  const [tutorMode, setTutorMode] = useState(false);
+  const [tutorInstructions, setTutorInstructions] = useState("");
+  const [tutorHistory, setTutorHistory] = useState([]);
+  const [tutorInput, setTutorInput] = useState("");
+  const [tutorLoading, setTutorLoading] = useState(false);
+  const [tutorTerminalOpen, setTutorTerminalOpen] = useState(false);
+  const tutorBottomRef = useRef(null);
+  const tutorInputRef = useRef(null);
+
   // Python terminal (inline)
   const [terminalOutput, setTerminalOutput] = useState([]);
   const [terminalLoading, setTerminalLoading] = useState(false);
@@ -306,6 +316,16 @@ export default function App() {
   useEffect(() => {
     if (chatBottomRef.current) chatBottomRef.current.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
+
+  // Scroll tutor to bottom
+  useEffect(() => {
+    if (tutorBottomRef.current) tutorBottomRef.current.scrollIntoView({ behavior: "smooth" });
+  }, [tutorHistory]);
+
+  // Focus tutor input when opened
+  useEffect(() => {
+    if (tutorMode && tutorInputRef.current) setTimeout(() => tutorInputRef.current.focus(), 100);
+  }, [tutorMode]);
 
   function saveToHistorial(codigo, respuesta) {
     const entry = {
@@ -380,6 +400,138 @@ export default function App() {
       });
     }
     setSideLoading(false);
+  }
+
+  async function startTutor() {
+    if (!code.trim()) return;
+    setTutorInstructions(code);
+    setTutorHistory([]);
+    setTutorInput("");
+    setTutorMode(true);
+    // Kick off first question
+    const sys = `Eres El Profesor — tutor socrático de programación en español.
+El estudiante te pegó estas instrucciones de un problema: """${code}"""
+
+TU MISIÓN: Guiar al estudiante a resolver el problema SOLO, sin darle la solución.
+- Haz UNA pregunta a la vez — corta, clara, directa
+- Si el estudiante está en el camino correcto, valídalo con una línea y haz la siguiente pregunta
+- Si el estudiante está equivocado, no lo corrijas directamente — hazle una pregunta que lo lleve a descubrir el error
+- Cuando el estudiante llegue a la solución completa, celébralo brevemente y explica por qué funciona
+- Máximo 3 líneas por respuesta
+- Empieza con una pregunta que evalúe qué entendió el estudiante del problema`;
+
+    setTutorLoading(true);
+    const firstMsg = { role: "user", content: "Quiero resolver este problema. ¿Por dónde empezamos?" };
+    setTutorHistory([firstMsg, { role: "assistant", content: "" }]);
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 200,
+          stream: true,
+          system: sys,
+          messages: [firstMsg]
+        })
+      });
+      setTutorLoading(false);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n").filter(l => l.startsWith("data: "));
+        for (const line of lines) {
+          const json = line.replace("data: ", "").trim();
+          if (json === "[DONE]") break;
+          try {
+            const parsed = JSON.parse(json);
+            const delta = parsed.delta?.text;
+            if (delta) {
+              fullText += delta;
+              setTutorHistory([firstMsg, { role: "assistant", content: fullText }]);
+            }
+          } catch {}
+        }
+      }
+    } catch {
+      setTutorLoading(false);
+      setTutorHistory([firstMsg, { role: "assistant", content: "Se cayó la conexión. Inténtalo de nuevo." }]);
+    }
+    setTutorLoading(false);
+  }
+
+  async function sendTutorMessage() {
+    if (!tutorInput.trim() || tutorLoading) return;
+    const sys = `Eres El Profesor — tutor socrático de programación en español.
+El estudiante está resolviendo: """${tutorInstructions}"""
+TU MISIÓN: Guiar con preguntas, no dar la solución. Máximo 3 líneas. Una pregunta a la vez.`;
+
+    const userMsg = { role: "user", content: tutorInput };
+    const newHistory = [...tutorHistory, userMsg];
+    setTutorHistory([...newHistory, { role: "assistant", content: "" }]);
+    setTutorInput("");
+    setTutorLoading(true);
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 200,
+          stream: true,
+          system: sys,
+          messages: newHistory
+        })
+      });
+      setTutorLoading(false);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n").filter(l => l.startsWith("data: "));
+        for (const line of lines) {
+          const json = line.replace("data: ", "").trim();
+          if (json === "[DONE]") break;
+          try {
+            const parsed = JSON.parse(json);
+            const delta = parsed.delta?.text;
+            if (delta) {
+              fullText += delta;
+              setTutorHistory(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1] = { role: "assistant", content: fullText };
+                return updated;
+              });
+            }
+          } catch {}
+        }
+      }
+    } catch {
+      setTutorLoading(false);
+      setTutorHistory(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1] = { role: "assistant", content: "Se cayó la conexión." };
+        return updated;
+      });
+    }
+    setTutorLoading(false);
   }
 
   async function runPython() {
@@ -489,6 +641,147 @@ export default function App() {
   const isDisabled = loading || (!code.trim() && !images.length);
 
   return (
+    {/* ── TUTOR MODE ── */}
+    {tutorMode && (
+      <div style={{ position: "fixed", inset: 0, background: C.cream, zIndex: 1000, display: "flex", flexDirection: "column" }}>
+
+        {/* TUTOR HEADER */}
+        <div style={{ background: C.burgundy, padding: `${S.md}px ${S.xl}px`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: S.md }}>
+            <span style={{ color: C.gold, fontSize: T.base, fontFamily: T.serif, fontWeight: T.bold, letterSpacing: T.normal_spacing }}>El Profesor</span>
+            <span style={{ ...label(), color: "rgba(200,151,31,0.5)", fontSize: 8 }}>modo tutor</span>
+          </div>
+          <div style={{ display: "flex", gap: S.sm, alignItems: "center" }}>
+            <button
+              onClick={() => setTutorTerminalOpen(p => !p)}
+              style={{ background: tutorTerminalOpen ? C.olive : "none", border: `1px solid ${C.olive}`, color: C.gold, fontSize: T.xs, padding: `${S.xs}px ${S.md}px`, cursor: "pointer", fontFamily: T.mono, letterSpacing: T.wide, textTransform: "uppercase" }}
+            >
+              🐍 Terminal
+            </button>
+            <button
+              onClick={() => { setTutorMode(false); setTutorHistory([]); setTutorInput(""); }}
+              style={{ background: "none", border: `1px solid rgba(200,151,31,0.4)`, color: C.gold, fontSize: T.xs, padding: `${S.xs}px ${S.md}px`, cursor: "pointer", fontFamily: T.sans, letterSpacing: T.wide, textTransform: "uppercase" }}
+            >
+              ✕ Salir
+            </button>
+          </div>
+        </div>
+
+        {/* PINNED INSTRUCTIONS */}
+        <div style={{ background: C.creamDark, borderBottom: `1px solid ${C.border}`, padding: `${S.sm}px ${S.xl}px`, flexShrink: 0, maxHeight: 80, overflowY: "auto" }}>
+          <span style={{ ...label(), color: C.gold, marginRight: S.sm }}>📌</span>
+          <span style={{ fontSize: T.sm, fontFamily: T.mono, color: C.textMid, lineHeight: 1.5 }}>
+            {tutorInstructions.length > 200 ? tutorInstructions.substring(0, 200) + "..." : tutorInstructions}
+          </span>
+        </div>
+
+        {/* MAIN AREA — chat + optional terminal */}
+        <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+
+          {/* CONVERSATION */}
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: `${S.xl}px ${S.xxl}px` }}>
+              {tutorHistory.map((msg, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", marginBottom: S.lg }}>
+                  {msg.role === "assistant" && (
+                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: C.burgundy, display: "flex", alignItems: "center", justifyContent: "center", marginRight: S.md, flexShrink: 0, alignSelf: "flex-end" }}>
+                      <span style={{ color: C.gold, fontSize: 14 }}>P</span>
+                    </div>
+                  )}
+                  <div style={{
+                    maxWidth: "65%",
+                    padding: `${S.md}px ${S.lg}px`,
+                    background: msg.role === "user" ? C.burgundy : C.white,
+                    color: msg.role === "user" ? C.cream : C.text,
+                    border: `1px solid ${msg.role === "user" ? C.burgundy : C.border}`,
+                    borderRadius: msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                    fontSize: T.md,
+                    fontFamily: T.sans,
+                    fontWeight: T.light,
+                    lineHeight: 1.7,
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                    boxShadow: msg.role === "assistant" ? `1px 1px 0 ${C.border}` : "none",
+                  }}>
+                    {msg.content || (tutorLoading && i === tutorHistory.length - 1 ? (
+                      <span style={{ color: C.textLight }}>...</span>
+                    ) : "")}
+                  </div>
+                </div>
+              ))}
+              <div ref={tutorBottomRef} />
+            </div>
+
+            {/* INPUT BAR */}
+            <div style={{ flexShrink: 0, borderTop: `1px solid ${C.border}`, padding: `${S.md}px ${S.xxl}px`, background: C.white, display: "flex", gap: S.sm, alignItems: "flex-end" }}>
+              <textarea
+                ref={tutorInputRef}
+                value={tutorInput}
+                onChange={e => {
+                  setTutorInput(e.target.value);
+                  e.target.style.height = "auto";
+                  e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+                }}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendTutorMessage(); } }}
+                placeholder="Escribe tu respuesta... (Enter para enviar, Shift+Enter para nueva línea)"
+                disabled={tutorLoading}
+                style={{ flex: 1, minHeight: 44, maxHeight: 120, padding: `${S.sm}px ${S.md}px`, border: `1px solid ${C.border}`, background: C.cream, color: C.text, fontSize: T.md, fontFamily: T.sans, fontWeight: T.light, resize: "none", outline: "none", borderRadius: 22, lineHeight: 1.6, overflow: "hidden", boxSizing: "border-box" }}
+              />
+              <button
+                onClick={sendTutorMessage}
+                disabled={tutorLoading || !tutorInput.trim()}
+                style={{ width: 44, height: 44, borderRadius: "50%", background: tutorLoading || !tutorInput.trim() ? C.border : C.burgundy, border: "none", color: C.gold, cursor: tutorLoading || !tutorInput.trim() ? "not-allowed" : "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}
+              >
+                ↑
+              </button>
+            </div>
+          </div>
+
+          {/* PYTHON TERMINAL — inline, toggleable */}
+          {tutorTerminalOpen && (
+            <div style={{ width: 320, background: "#1E1E1E", borderLeft: `1px solid ${C.gold}`, display: "flex", flexDirection: "column", flexShrink: 0 }}>
+              <div style={{ padding: `${S.sm}px ${S.md}px`, borderBottom: "1px solid #333", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ color: C.gold, fontSize: T.xs, fontFamily: T.mono, letterSpacing: T.wide }}>
+                  {pyodideReady ? "🐍 listo" : "🐍 cargando..."}
+                </span>
+                {terminalOutput.length > 0 && (
+                  <button onClick={() => setTerminalOutput([])} style={{ background: "none", border: "none", color: "#666", fontSize: T.xs, cursor: "pointer", fontFamily: T.mono }}>limpiar</button>
+                )}
+              </div>
+              <div style={{ flex: 1, overflowY: "auto", padding: S.md, fontFamily: T.mono, fontSize: T.sm }}>
+                {terminalOutput.length === 0 && <div style={{ color: "#555", fontSize: T.xs }}>escribe código y presiona Correr</div>}
+                {terminalOutput.map((line, i) => (
+                  <div key={i} style={{ marginBottom: S.xs }}>
+                    {line.type === "output" && <div style={{ color: "#D4D4D4", whiteSpace: "pre-wrap" }}>{line.text}</div>}
+                    {line.type === "error" && <div style={{ color: "#F44747", whiteSpace: "pre-wrap" }}>{line.text}</div>}
+                    {line.type === "silent" && <div style={{ color: "#555", fontStyle: "italic" }}>{line.text}</div>}
+                  </div>
+                ))}
+              </div>
+              <div style={{ padding: S.sm, borderTop: "1px solid #333" }}>
+                <textarea
+                  value={code}
+                  onChange={e => setCode(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Tab") { e.preventDefault(); const s = e.target.selectionStart; setCode(c => c.substring(0, s) + "    " + c.substring(e.target.selectionEnd)); setTimeout(() => { e.target.selectionStart = e.target.selectionEnd = s + 4; }, 0); }
+                  }}
+                  placeholder="# escribe tu código aquí"
+                  style={{ width: "100%", minHeight: 120, padding: S.sm, background: "#2D2D2D", border: "1px solid #444", color: "#D4D4D4", fontSize: T.sm, fontFamily: T.mono, resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.6 }}
+                />
+                <button
+                  onClick={runPython}
+                  disabled={!pyodideReady || terminalLoading || !code.trim()}
+                  style={{ ...btnPrimary(!pyodideReady || terminalLoading || !code.trim()), width: "100%", padding: `${S.sm}px`, marginTop: S.xs, fontSize: T.xs, letterSpacing: T.wide, background: (!pyodideReady || terminalLoading || !code.trim()) ? "#333" : C.olive }}
+                >
+                  {!pyodideReady ? "cargando..." : terminalLoading ? "corriendo..." : "▶ Correr"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+
     <div style={{ minHeight: "100vh", background: C.cream, color: C.text, fontFamily: T.sans, fontWeight: T.light, padding: "0 0 80px 0" }}>
 
       <div style={{ height: 6, background: `linear-gradient(90deg, ${C.burgundy}, ${C.burgundyMid} 40%, ${C.gold} 60%, ${C.olive})` }} />
@@ -729,20 +1022,27 @@ export default function App() {
           )}
         </div>
 
-        <div style={{ display: "flex", gap: S.sm, marginBottom: S.xxxl }}>
+        <div style={{ display: "flex", gap: S.sm, marginBottom: S.xxxl, flexWrap: "wrap" }}>
           <button
             onClick={askProfe}
             disabled={isDisabled}
-            style={{ ...btnPrimary(isDisabled), flex: 3, padding: `${S.lg}px`, boxShadow: isDisabled ? "none" : `2px 2px 0 ${C.text}`, letterSpacing: T.widest }}
+            style={{ ...btnPrimary(isDisabled), flex: 3, minWidth: 160, padding: `${S.lg}px`, boxShadow: isDisabled ? "none" : `2px 2px 0 ${C.text}`, letterSpacing: T.widest }}
           >
             {loading ? `... ${LOADING_FRASES[fraseIdx]}` : "Iniciar Debug"}
           </button>
           <button
             onClick={runPython}
             disabled={!pyodideReady || terminalLoading || (!code.trim() && !images.length)}
-            style={{ ...btnPrimary(!pyodideReady || terminalLoading || (!code.trim() && !images.length)), flex: 1, padding: `${S.lg}px`, boxShadow: (!pyodideReady || terminalLoading || (!code.trim() && !images.length)) ? "none" : `2px 2px 0 ${C.text}`, letterSpacing: T.widest, background: (!pyodideReady || terminalLoading || (!code.trim() && !images.length)) ? C.creamDark : C.olive }}
+            style={{ ...btnPrimary(!pyodideReady || terminalLoading || (!code.trim() && !images.length)), flex: 1, minWidth: 80, padding: `${S.lg}px`, boxShadow: (!pyodideReady || terminalLoading || (!code.trim() && !images.length)) ? "none" : `2px 2px 0 ${C.text}`, letterSpacing: T.widest, background: (!pyodideReady || terminalLoading || (!code.trim() && !images.length)) ? C.creamDark : C.olive }}
           >
-            {!pyodideReady ? "..." : terminalLoading ? "▶ corriendo" : "▶ Correr"}
+            {!pyodideReady ? "..." : terminalLoading ? "▶" : "▶ Correr"}
+          </button>
+          <button
+            onClick={startTutor}
+            disabled={!code.trim()}
+            style={{ ...btnPrimary(!code.trim()), flex: 2, minWidth: 140, padding: `${S.lg}px`, boxShadow: !code.trim() ? "none" : `2px 2px 0 ${C.text}`, letterSpacing: T.widest, background: !code.trim() ? C.creamDark : C.gold, color: !code.trim() ? C.textLight : C.burgundy, border: `1px solid ${!code.trim() ? C.border : C.gold}` }}
+          >
+            Hagamos esto juntos
           </button>
         </div>
 
