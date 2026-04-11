@@ -393,16 +393,15 @@ export default function App() {
   async function runPython() {
     if (!terminalCode.trim() || !pyodideReady) return;
     setTerminalLoading(true);
-    const input = { type: "input", text: terminalCode };
-    setTerminalOutput(prev => [...prev, input]);
     try {
       let output = "";
       pyodideRef.current.setStdout({ batched: (text) => { output += text + "\n"; } });
-      pyodideRef.current.setStderr({ batched: (text) => { output += "Error: " + text + "\n"; } });
+      pyodideRef.current.setStderr({ batched: (text) => { output += text + "\n"; } });
       await pyodideRef.current.runPythonAsync(terminalCode);
-      if (output.trim()) {
-        setTerminalOutput(prev => [...prev, { type: "output", text: output.trim() }]);
-      }
+      setTerminalOutput(prev => [...prev, {
+        type: output.trim() ? "output" : "silent",
+        text: output.trim() || ""
+      }]);
     } catch (err) {
       setTerminalOutput(prev => [...prev, { type: "error", text: err.message }]);
     }
@@ -750,18 +749,18 @@ export default function App() {
         </button>
 
         {/* ── FLOATING BUTTONS LEFT SIDE ── */}
-        <div style={{ position: "fixed", left: 0, top: "40%", transform: "translateY(-50%)", zIndex: 500, display: "flex", flexDirection: "column", gap: S.xs }}>
+        <div style={{ position: "fixed", left: 0, top: "50%", transform: "translateY(-50%)", zIndex: 500, display: "flex", flexDirection: "column", gap: 2 }}>
           <button
             onClick={() => { setShowSidePanel(p => !p); setShowTerminal(false); }}
-            style={{ background: showSidePanel ? C.gold : C.burgundy, border: `1px solid ${C.gold}`, color: showSidePanel ? C.burgundy : C.gold, padding: `${S.lg}px ${S.sm}px`, cursor: "pointer", fontFamily: T.mono, fontSize: T.xs, letterSpacing: T.wider, textTransform: "uppercase", writingMode: "vertical-rl", borderRadius: "0 4px 4px 0" }}
+            style={{ background: showSidePanel ? C.gold : C.burgundy, border: `1px solid ${C.gold}`, borderLeft: "none", color: showSidePanel ? C.burgundy : C.gold, padding: `${S.xl}px ${S.md}px`, cursor: "pointer", fontFamily: T.sans, fontSize: T.sm, fontWeight: T.bold, letterSpacing: T.wide, textTransform: "uppercase", writingMode: "vertical-rl", borderRadius: "0 6px 6px 0", boxShadow: `2px 2px 0 ${C.text}`, transition: "all 0.15s" }}
           >
-            Chat
+            💬 Chat
           </button>
           <button
             onClick={() => { setShowTerminal(p => !p); setShowSidePanel(false); }}
-            style={{ background: showTerminal ? C.gold : C.burgundy, border: `1px solid ${C.gold}`, color: showTerminal ? C.burgundy : C.gold, padding: `${S.lg}px ${S.sm}px`, cursor: "pointer", fontFamily: T.mono, fontSize: T.xs, letterSpacing: T.wider, textTransform: "uppercase", writingMode: "vertical-rl", borderRadius: "0 4px 4px 0" }}
+            style={{ background: showTerminal ? C.gold : C.olive, border: `1px solid ${C.gold}`, borderLeft: "none", color: showTerminal ? C.burgundy : C.gold, padding: `${S.xl}px ${S.md}px`, cursor: "pointer", fontFamily: T.sans, fontSize: T.sm, fontWeight: T.bold, letterSpacing: T.wide, textTransform: "uppercase", writingMode: "vertical-rl", borderRadius: "0 6px 6px 0", boxShadow: `2px 2px 0 ${C.text}`, transition: "all 0.15s" }}
           >
-            Python
+            🐍 Python
           </button>
         </div>
 
@@ -841,15 +840,9 @@ export default function App() {
                 </div>
               )}
               {terminalOutput.map((line, i) => (
-                <div key={i} style={{ marginBottom: S.xs }}>
-                  {line.type === "input" && (
-                    <div style={{ color: "#569CD6" }}>
-                      <span style={{ color: "#666" }}>{">>> "}</span>
-                      {line.text}
-                    </div>
-                  )}
-                  {line.type === "output" && <div style={{ color: "#D4D4D4", whiteSpace: "pre-wrap" }}>{line.text}</div>}
-                  {line.type === "error" && <div style={{ color: "#F44747", whiteSpace: "pre-wrap" }}>{line.text}</div>}
+                <div key={i} style={{ marginBottom: S.sm }}>
+                  {line.type === "output" && <div style={{ color: "#D4D4D4", whiteSpace: "pre-wrap", borderLeft: "2px solid #569CD6", paddingLeft: S.sm }}>{line.text}</div>}
+                  {line.type === "error" && <div style={{ color: "#F44747", whiteSpace: "pre-wrap", borderLeft: "2px solid #F44747", paddingLeft: S.sm }}>{line.text}</div>}
                 </div>
               ))}
               <div ref={terminalBottomRef} />
