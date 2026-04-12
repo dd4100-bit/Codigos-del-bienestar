@@ -90,6 +90,7 @@ export default function TutorMode({ code, setCode, onClose, runPython, pyodideRe
   }, [tutorHistory]);
 
   useEffect(() => {
+    setCode("");                          // terminal inicia vacía
     setTimeout(() => tutorInputRef.current?.focus(), 100);
     initTutor();
   }, []); // eslint-disable-line
@@ -237,14 +238,6 @@ TU MISIÓN: Guiar con preguntas, no dar la solución. Máximo 3 líneas. Una pre
         </button>
       </div>
 
-      {/* ── PINNED INSTRUCTIONS ─────────────────────────────────────────────── */}
-      <div style={{ background: C.creamDark, borderBottom: `1px solid ${C.border}`, padding: `${S.sm}px ${S.xl}px`, flexShrink: 0, maxHeight: 80, overflowY: "auto" }}>
-        <span style={{ ...label(), color: C.gold, marginRight: S.sm }}>📌</span>
-        <span style={{ fontSize: T.sm, fontFamily: T.mono, color: C.textMid, lineHeight: 1.5 }}>
-          {tutorInstructions.length > 200 ? tutorInstructions.substring(0, 200) + "..." : tutorInstructions}
-        </span>
-      </div>
-
       {/* ── MAIN AREA — conversation (left) + terminal (right, always visible) ── */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
 
@@ -253,6 +246,28 @@ TU MISIÓN: Guiar con preguntas, no dar la solución. Máximo 3 líneas. Una pre
 
           {/* Message list */}
           <div style={{ flex: 1, overflowY: "auto", padding: `${S.xl}px ${S.xxl}px` }}>
+
+            {/* Problem bubble — always first */}
+            <div style={{ marginBottom: S.xl }}>
+              <div style={{
+                background: C.creamDark,
+                border: `1px solid ${C.border}`,
+                borderLeft: `3px solid ${C.gold}`,
+                borderRadius: "4px 18px 18px 4px",
+                padding: `${S.md}px ${S.lg}px`,
+                fontSize: T.sm,
+                fontFamily: T.mono,
+                fontWeight: T.light,
+                color: C.textMid,
+                lineHeight: 1.7,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+              }}>
+                <span style={{ ...label(), color: C.gold, display: "block", marginBottom: S.xs, fontSize: T.xs, letterSpacing: T.wider }}>📌 Problema:</span>
+                {tutorInstructions}
+              </div>
+            </div>
+
             {tutorHistory.map((msg, i) => (
               <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", marginBottom: S.lg }}>
                 {msg.role === "assistant" && (
