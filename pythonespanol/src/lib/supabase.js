@@ -11,6 +11,14 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 export const supabase = createClient(
-  supabaseUrl  ?? "https://placeholder.supabase.co",
-  supabaseKey  ?? "placeholder"
+  supabaseUrl ?? "https://placeholder.supabase.co",
+  supabaseKey ?? "placeholder",
+  {
+    auth: {
+      persistSession:    true,   // guarda el token en localStorage
+      autoRefreshToken:  true,   // renueva el token antes de que expire
+      detectSessionInUrl: true,  // maneja tokens en el hash de URL (OAuth)
+      storageKey: "elprofesor_session",
+    },
+  }
 );

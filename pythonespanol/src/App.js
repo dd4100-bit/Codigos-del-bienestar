@@ -13,14 +13,17 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
+    // Recupera la sesión persistida — fuente de verdad al cargar la app.
+    // authLoading se apaga SOLO aquí para evitar race conditions con
+    // onAuthStateChange, que puede disparar antes de que el token se refresque.
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setAuthLoading(false);
     });
 
+    // Escucha cambios posteriores (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      setAuthLoading(false);
     });
 
     return () => subscription.unsubscribe();
