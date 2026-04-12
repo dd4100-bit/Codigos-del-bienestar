@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { C, T, S } from "../constants";
+import { supabase } from "../lib/supabase";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DATA
@@ -979,7 +980,7 @@ function GameOverScreen({ enemy, stats, enemyIndex, onRestart }) {
 // MAIN GAME COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 
-export default function Game({ onClose }) {
+export default function Game({ onClose, user }) {
   // ── Persistent ──────────────────────────────────────────────────────────
   const [stats, setStats] = useState(() => loadStats());
 
@@ -1000,12 +1001,41 @@ export default function Game({ onClose }) {
 
   const enemy = ENEMIES[enemyIndex];
 
-  // Update streak on mount
+  // ── Supabase sync helper (fire-and-forget) ─────────────────────────────
+  function syncStatsToSupabase(s) {
+    if (!user?.id) return;
+    supabase.from("game_stats").upsert(
+      { user_id: user.id, xp: s.xp, level: getLevelFromXP(s.xp), streak: s.streak ?? 0, last_played: s.lastPlayed },
+      { onConflict: "user_id" }
+    ).then(() => {}).catch(() => {});
+  }
+
+  // On mount: update streak, then merge with Supabase stats (highest XP wins)
   useEffect(() => {
-    const updated = updateStreak(stats);
-    if (updated !== stats) {
-      setStats(updated);
-      saveStats(updated);
+    const local = updateStreak(stats);
+
+    if (user?.id) {
+      supabase.from("game_stats").select("xp, streak, last_played").eq("user_id", user.id).single()
+        .then(({ data }) => {
+          if (data) {
+            const merged = {
+              xp:         Math.max(local.xp, data.xp ?? 0),
+              streak:     Math.max(local.streak ?? 0, data.streak ?? 0),
+              lastPlayed: data.last_played ?? local.lastPlayed,
+            };
+            setStats(merged);
+            saveStats(merged);
+          } else {
+            if (local !== stats) { setStats(local); saveStats(local); }
+            syncStatsToSupabase(local);
+          }
+        })
+        .catch(() => {
+          if (local !== stats) { setStats(local); saveStats(local); }
+        });
+    } else if (local !== stats) {
+      setStats(local);
+      saveStats(local);
     }
   }, []); // eslint-disable-line
 
@@ -1085,6 +1115,7 @@ export default function Game({ onClose }) {
     setXpGain(gained);
     setStats(newStats);
     saveStats(newStats);
+    syncStatsToSupabase(newStats);
     setPhase("victory");
   }
 

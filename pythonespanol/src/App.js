@@ -4,18 +4,39 @@ import Profesor from "./components/Profesor";
 import TutorMode from "./components/TutorMode";
 import Chat from "./components/Chat";
 import Game from "./game";
+import Auth from "./components/Auth";
+import { supabase } from "./lib/supabase";
 
 export default function App() {
-  const [code, setCode] = useState("");
-  const [images, setImages] = useState([]);
-  const [tutorMode, setTutorMode] = useState(false);
-  const [gameMode, setGameMode] = useState(false);
+  // ── Auth ─────────────────────────────────────────────────────────────────
+  const [session, setSession]       = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // ── App state ────────────────────────────────────────────────────────────
+  const [code, setCode]                   = useState("");
+  const [images, setImages]               = useState([]);
+  const [tutorMode, setTutorMode]         = useState(false);
+  const [gameMode, setGameMode]           = useState(false);
   const [terminalOutput, setTerminalOutput] = useState([]);
   const [terminalLoading, setTerminalLoading] = useState(false);
-  const [pyodideReady, setPyodideReady] = useState(false);
+  const [pyodideReady, setPyodideReady]   = useState(false);
   const pyodideRef = useRef(null);
 
-  // Load Pyodide once on mount
+  // ── Pyodide ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (typeof window === "undefined") return;
     const script = document.createElement("script");
@@ -46,20 +67,35 @@ export default function App() {
     setTerminalLoading(false);
   }
 
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+  }
+
   function handleStartTutor() {
     if (!code.trim()) return;
     setTutorMode(true);
   }
 
-  function handleCloseTutor() {
-    setTutorMode(false);
+  // ── Render ────────────────────────────────────────────────────────────────
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: "100vh", background: C.cream, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ color: C.textLight, fontFamily: T.sans, fontWeight: 300, letterSpacing: 2, textTransform: "uppercase", fontSize: 12 }}>cargando...</div>
+      </div>
+    );
   }
+
+  if (!session) {
+    return <Auth />;
+  }
+
+  const user = session.user;
 
   return (
     <>
       {gameMode && (
         <div style={{ position: "fixed", inset: 0, zIndex: 600, overflow: "auto" }}>
-          <Game onClose={() => setGameMode(false)} />
+          <Game onClose={() => setGameMode(false)} user={user} />
         </div>
       )}
 
@@ -67,7 +103,7 @@ export default function App() {
         <TutorMode
           code={code}
           setCode={setCode}
-          onClose={handleCloseTutor}
+          onClose={() => setTutorMode(false)}
           runPython={runPython}
           pyodideReady={pyodideReady}
           terminalOutput={terminalOutput}
@@ -77,7 +113,6 @@ export default function App() {
       )}
 
       {!tutorMode && !gameMode && (
-        /* Game launch button — fixed bottom-right */
         <button
           onClick={() => setGameMode(true)}
           style={{
@@ -110,6 +145,8 @@ export default function App() {
             terminalOutput={terminalOutput}
             setTerminalOutput={setTerminalOutput}
             terminalLoading={terminalLoading}
+            user={user}
+            onSignOut={handleSignOut}
           />
           <Chat />
         </>

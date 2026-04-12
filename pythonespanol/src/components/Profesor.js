@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { C, T, S, label, btnPrimary, btnSecondary, btnGhost, AMLO_SYSTEM_PROMPT, LOADING_FRASES, EJEMPLOS } from "../constants";
 import { AMLOCartoon, formatResponse } from "./utils";
 import Terminal from "./Terminal";
+import { supabase } from "../lib/supabase";
 
 // ── File attachment helpers ────────────────────────────────────────────────────
 
@@ -101,7 +102,7 @@ async function extractTextFromFile(file) {
   return await file.text();
 }
 
-export default function Profesor({ code, setCode, images, setImages, runPython, onStartTutor, pyodideReady, terminalOutput, setTerminalOutput, terminalLoading }) {
+export default function Profesor({ code, setCode, images, setImages, runPython, onStartTutor, pyodideReady, terminalOutput, setTerminalOutput, terminalLoading, user, onSignOut }) {
   const [intention, setIntention] = useState("");
   const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
@@ -126,10 +127,33 @@ export default function Profesor({ code, setCode, images, setImages, runPython, 
   const responseRef    = useRef(null);
   const intervalRef    = useRef(null);
 
+  // Load historial — Supabase when authenticated, localStorage as fallback
   useEffect(() => {
-    try { const s = localStorage.getItem("elprofesor_historial"); if (s) setHistorial(JSON.parse(s)); } catch {}
-  }, []);
+    async function loadHistorial() {
+      if (user?.id) {
+        try {
+          const { data, error } = await supabase
+            .from("conversations")
+            .select("id, fecha, codigo, resumen")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(10);
+          if (!error && data?.length) {
+            setHistorial(data);
+            return;
+          }
+        } catch {}
+      }
+      // Fallback: localStorage (also used when not logged in)
+      try {
+        const s = localStorage.getItem("elprofesor_historial");
+        if (s) setHistorial(JSON.parse(s));
+      } catch {}
+    }
+    loadHistorial();
+  }, [user?.id]); // eslint-disable-line
 
+  // Keep localStorage in sync as offline backup
   useEffect(() => {
     try { localStorage.setItem("elprofesor_historial", JSON.stringify(historial)); } catch {}
   }, [historial]);
@@ -144,13 +168,29 @@ export default function Profesor({ code, setCode, images, setImages, runPython, 
     if (response && responseRef.current) responseRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [response]);
 
-  function saveToHistorial(codigo, respuesta) {
-    const entry = {
-      id: Date.now(),
-      fecha: new Date().toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }),
-      codigo: codigo.substring(0, 80) + (codigo.length > 80 ? "..." : ""),
-      resumen: respuesta.substring(0, 120) + "...",
-    };
+  async function saveToHistorial(codigo, respuesta) {
+    const fecha   = new Date().toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    const codSnip = codigo.substring(0, 80)  + (codigo.length > 80  ? "..." : "");
+    const resSnip = respuesta.substring(0, 120) + "...";
+
+    if (user?.id) {
+      // Save to Supabase — use the returned id as the local entry id
+      try {
+        const { data } = await supabase.from("conversations").insert({
+          user_id: user.id,
+          fecha,
+          codigo:  codSnip,
+          resumen: resSnip,
+        }).select("id").single();
+
+        const entry = { id: data?.id ?? Date.now(), fecha, codigo: codSnip, resumen: resSnip };
+        setHistorial(prev => [entry, ...prev].slice(0, 10));
+        return;
+      } catch {}
+    }
+
+    // Fallback: localStorage-only entry
+    const entry = { id: Date.now(), fecha, codigo: codSnip, resumen: resSnip };
     setHistorial(prev => [entry, ...prev].slice(0, 10));
   }
 
@@ -249,13 +289,20 @@ Responde SOLO con este JSON array (sin markdown, sin texto adicional):
     }
 
     const total = Object.values(byErrorType).flat().length;
-    try {
-      localStorage.setItem("offline_quizzes", JSON.stringify({
-        saved_at:     new Date().toISOString(),
-        byErrorType,
-        totalQuestions: total,
-      }));
-    } catch {/* localStorage full — still show done */}
+    const payload = { saved_at: new Date().toISOString(), byErrorType, totalQuestions: total };
+
+    // Save to localStorage (always)
+    try { localStorage.setItem("offline_quizzes", JSON.stringify(payload)); } catch {}
+
+    // Sync to Supabase (when authenticated)
+    if (user?.id) {
+      try {
+        await supabase.from("offline_quizzes").upsert(
+          { user_id: user.id, content: payload },
+          { onConflict: "user_id" }
+        );
+      } catch {}
+    }
 
     setOfflineCount(total);
     setOfflineProgress(null);
@@ -398,7 +445,21 @@ Responde SOLO con este JSON array (sin markdown, sin texto adicional):
             <div style={{ ...label(), color: "rgba(200,151,31,0.5)", fontSize: 8 }}>El Profesor · Python en Español</div>
           </div>
         </div>
-        <span style={{ ...label(), color: "rgba(200,151,31,0.4)" }}>Servicio Gratuito</span>
+        {user ? (
+          <div style={{ display: "flex", alignItems: "center", gap: S.sm }}>
+            <span style={{ ...label(), color: "rgba(200,151,31,0.35)", fontSize: 9 }}>
+              {user.email?.split("@")[0]}
+            </span>
+            <button
+              onClick={onSignOut}
+              style={{ background: "none", border: `1px solid rgba(200,151,31,0.3)`, color: "rgba(200,151,31,0.5)", fontSize: 9, padding: "2px 6px", cursor: "pointer", fontFamily: T.sans, letterSpacing: T.wide, textTransform: "uppercase" }}
+            >
+              salir
+            </button>
+          </div>
+        ) : (
+          <span style={{ ...label(), color: "rgba(200,151,31,0.4)" }}>Servicio Gratuito</span>
+        )}
       </div>
 
       {/* HERO */}
