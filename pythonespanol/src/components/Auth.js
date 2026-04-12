@@ -56,7 +56,12 @@ export default function Auth() {
       console.log("[auth] signUp →", { signUpData, signUpError });
 
       if (signUpError) {
-        setError(signUpError.message);
+        // 422: usuario ya existe pero está pendiente de confirmación de email
+        if (signUpError.status === 422 || signUpError.message.toLowerCase().includes("already registered")) {
+          setConfirming(true); // mostrar pantalla "confirma tu correo"
+        } else {
+          setError(signUpError.message);
+        }
       } else if (signUpData.session) {
         // Email confirmation desactivado → sesión inmediata
         console.log("[auth] Registro + sesión inmediata:", signUpData.session.user?.email);
