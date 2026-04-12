@@ -3,106 +3,46 @@ import { C, T, S, label, btnPrimary } from "../constants";
 import { supabase } from "../lib/supabase";
 
 export default function Auth() {
-  const [email, setEmail]           = useState("");
-  const [password, setPassword]     = useState("");
-  const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState(null);
-  const [confirming, setConfirming] = useState(false); // signUp sent, awaiting email confirm
+  const [email, setEmail]       = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState(null);
 
   async function handleEntrar() {
     const emailVal = email.trim();
-    const passVal  = password.trim();
+    const passVal  = password;
 
-    if (!emailVal || !passVal) {
-      setError("Completa email y contraseña.");
-      return;
-    }
-    if (passVal.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres.");
-      return;
-    }
+    if (!emailVal || !passVal) { setError("Completa email y contraseña."); return; }
+    if (passVal.length < 6)    { setError("La contraseña debe tener al menos 6 caracteres."); return; }
 
     setError(null);
     setLoading(true);
 
-    console.log("[auth] Intentando signInWithPassword para:", emailVal);
+    // ── 1. Intentar login ─────────────────────────────────────────────────
+    const { error: signInErr } = await supabase.auth.signInWithPassword({ email: emailVal, password: passVal });
 
-    // ── 1. Intenta login ──────────────────────────────────────────────────
-    const { data: signInData, error: signInError } =
-      await supabase.auth.signInWithPassword({ email: emailVal, password: passVal });
-
-    console.log("[auth] signInWithPassword →", { signInData, signInError });
-
-    if (!signInError) {
-      // Éxito — App.js reacciona vía onAuthStateChange
-      console.log("[auth] Login exitoso, sesión:", signInData.session?.user?.email);
+    if (!signInErr) {
+      // Sesión activa — App.js reacciona vía onAuthStateChange
       setLoading(false);
       return;
     }
 
-    // ── 2. No existe → registrar ──────────────────────────────────────────
-    const isNewUser =
-      signInError.message.toLowerCase().includes("invalid login credentials") ||
-      signInError.message.toLowerCase().includes("invalid credentials") ||
-      signInError.status === 400;
+    // ── 2. Si no existe, registrar ────────────────────────────────────────
+    const notFound =
+      signInErr.message.toLowerCase().includes("invalid login credentials") ||
+      signInErr.message.toLowerCase().includes("invalid credentials");
 
-    console.log("[auth] signIn falló. isNewUser:", isNewUser, "| mensaje:", signInError.message);
-
-    if (isNewUser) {
-      console.log("[auth] Intentando signUp...");
-      const { data: signUpData, error: signUpError } =
-        await supabase.auth.signUp({ email: emailVal, password: passVal });
-
-      console.log("[auth] signUp →", { signUpData, signUpError });
-
-      if (signUpError) {
-        // 422: usuario ya existe pero está pendiente de confirmación de email
-        if (signUpError.status === 422 || signUpError.message.toLowerCase().includes("already registered")) {
-          setConfirming(true); // mostrar pantalla "confirma tu correo"
-        } else {
-          setError(signUpError.message);
-        }
-      } else if (signUpData.session) {
-        // Email confirmation desactivado → sesión inmediata
-        console.log("[auth] Registro + sesión inmediata:", signUpData.session.user?.email);
-      } else {
-        // Email confirmation activado → hay que confirmar primero
-        console.log("[auth] Registro OK pero requiere confirmación de email.");
-        setConfirming(true);
-      }
+    if (notFound) {
+      const { error: signUpErr } = await supabase.auth.signUp({ email: emailVal, password: passVal });
+      if (signUpErr) setError(signUpErr.message);
+      // Si signUp OK y email confirm está OFF → onAuthStateChange dispara solo
     } else {
-      setError(signInError.message);
+      setError(signInErr.message);
     }
 
     setLoading(false);
   }
 
-  // ── Confirmación de email pendiente ──────────────────────────────────────
-  if (confirming) {
-    return (
-      <div style={{ minHeight: "100vh", background: C.cream, display: "flex", flexDirection: "column", fontFamily: T.sans }}>
-        <div style={{ height: 6, background: `linear-gradient(90deg, ${C.burgundy}, ${C.gold} 60%, ${C.olive})` }} />
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: S.xl }}>
-          <div style={{ maxWidth: 380, textAlign: "center" }}>
-            <div style={{ fontSize: 36, marginBottom: S.lg }}>📬</div>
-            <h2 style={{ fontFamily: T.serif, color: C.burgundy, marginBottom: S.md }}>Confirma tu correo</h2>
-            <p style={{ color: C.textMid, fontSize: T.md, fontWeight: T.light, lineHeight: 1.7 }}>
-              Enviamos un link a <strong>{email}</strong>.<br />
-              Haz click en él y vuelve aquí para entrar.
-            </p>
-            <button
-              onClick={() => { setConfirming(false); setError(null); }}
-              style={{ marginTop: S.xl, background: "none", border: "none", color: C.textMid, fontSize: T.sm, cursor: "pointer", textDecoration: "underline", fontFamily: T.sans }}
-            >
-              Volver al login
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Formulario principal ──────────────────────────────────────────────────
   return (
     <div style={{ minHeight: "100vh", background: C.cream, display: "flex", flexDirection: "column", fontFamily: T.sans }}>
 
@@ -110,7 +50,7 @@ export default function Auth() {
 
       <div style={{ background: C.burgundy, padding: `${S.md}px ${S.xl}px`, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ color: C.gold, fontSize: T.base, fontFamily: T.serif, fontWeight: T.bold, letterSpacing: T.normal_spacing, lineHeight: 1.2 }}>Códigos del Bienestar</div>
+          <div style={{ color: C.gold, fontSize: T.base, fontFamily: T.serif, fontWeight: T.bold, letterSpacing: T.normal_spacing }}>Códigos del Bienestar</div>
           <div style={{ ...label(), color: "rgba(200,151,31,0.5)", fontSize: 8 }}>El Profesor · Python en Español</div>
         </div>
       </div>
@@ -124,8 +64,7 @@ export default function Auth() {
             </h1>
             <div style={{ width: 48, height: 3, background: `linear-gradient(90deg,${C.gold},${C.olive})`, borderRadius: 2, margin: "0 auto", marginBottom: S.md }} />
             <p style={{ color: C.textMid, fontSize: T.md, fontWeight: T.light, lineHeight: 1.6, margin: 0 }}>
-              Tu tutor de Python en español.<br />
-              Entra o crea tu cuenta — el botón hace las dos cosas.
+              Entra o crea tu cuenta.<br />El botón hace las dos cosas.
             </p>
           </div>
 
@@ -136,13 +75,7 @@ export default function Auth() {
             onKeyDown={e => e.key === "Enter" && handleEntrar()}
             placeholder="tu@correo.com"
             autoComplete="email"
-            style={{
-              width: "100%", padding: `${S.md}px ${S.lg}px`,
-              border: `1px solid ${C.border}`, background: C.creamDark,
-              color: C.text, fontSize: T.md, fontFamily: T.sans,
-              outline: "none", boxSizing: "border-box",
-              marginBottom: S.sm, letterSpacing: T.normal_spacing,
-            }}
+            style={{ width: "100%", padding: `${S.md}px ${S.lg}px`, border: `1px solid ${C.border}`, background: C.creamDark, color: C.text, fontSize: T.md, fontFamily: T.sans, outline: "none", boxSizing: "border-box", marginBottom: S.sm }}
           />
           <input
             type="password"
@@ -151,40 +84,24 @@ export default function Auth() {
             onKeyDown={e => e.key === "Enter" && handleEntrar()}
             placeholder="contraseña (mín. 6 caracteres)"
             autoComplete="current-password"
-            style={{
-              width: "100%", padding: `${S.md}px ${S.lg}px`,
-              border: `1px solid ${C.border}`, background: C.creamDark,
-              color: C.text, fontSize: T.md, fontFamily: T.sans,
-              outline: "none", boxSizing: "border-box",
-              marginBottom: S.lg, letterSpacing: T.normal_spacing,
-            }}
+            style={{ width: "100%", padding: `${S.md}px ${S.lg}px`, border: `1px solid ${C.border}`, background: C.creamDark, color: C.text, fontSize: T.md, fontFamily: T.sans, outline: "none", boxSizing: "border-box", marginBottom: S.lg }}
           />
 
           <button
             onClick={handleEntrar}
             disabled={loading}
-            style={{
-              ...btnPrimary(loading),
-              width: "100%", padding: `${S.lg}px`,
-              letterSpacing: T.widest,
-              boxShadow: loading ? "none" : `2px 2px 0 ${C.text}`,
-            }}
+            style={{ ...btnPrimary(loading), width: "100%", padding: `${S.lg}px`, letterSpacing: T.widest, boxShadow: loading ? "none" : `2px 2px 0 ${C.text}` }}
           >
             {loading ? "Entrando..." : "Entrar"}
           </button>
 
           {error && (
-            <div style={{
-              marginTop: S.md, padding: `${S.sm}px ${S.md}px`,
-              background: "#fef2f2", border: "1px solid #fca5a5",
-              color: "#991b1b", fontSize: T.sm, fontFamily: T.sans,
-              lineHeight: 1.5,
-            }}>
+            <div style={{ marginTop: S.md, padding: `${S.sm}px ${S.md}px`, background: "#fef2f2", border: "1px solid #fca5a5", color: "#991b1b", fontSize: T.sm, fontFamily: T.sans }}>
               {error}
             </div>
           )}
 
-          <p style={{ marginTop: S.xxl, textAlign: "center", color: C.textLight, fontSize: T.xs, fontFamily: T.sans, fontWeight: T.light, letterSpacing: T.normal_spacing, lineHeight: 1.7 }}>
+          <p style={{ marginTop: S.xxl, textAlign: "center", color: C.textLight, fontSize: T.xs, fontFamily: T.sans, fontWeight: T.light, lineHeight: 1.7 }}>
             Si no tienes cuenta, se crea automáticamente.
           </p>
         </div>
