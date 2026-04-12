@@ -2,52 +2,56 @@ import { useState, useRef, useEffect } from "react";
 import { C, T, S, label, btnPrimary } from "../constants";
 import { supabase } from "../lib/supabase";
 
-// ── Parse assistant message — detect ```code``` blocks and inject "→ Terminal" ─
+// ── Code block with per-block Copiar + → Terminal buttons ────────────────────
+function CodeBlock({ codeText, onSendToTerminal }) {
+  const [blockCopied, setBlockCopied] = useState(false);
+
+  function handleCopy() {
+    navigator.clipboard.writeText(codeText).then(() => {
+      setBlockCopied(true);
+      setTimeout(() => setBlockCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div style={{ position: "relative", margin: "6px 0" }}>
+      <pre style={{
+        background: "#1E1E1E", color: "#D4D4D4",
+        padding: "12px", paddingRight: 100,
+        borderRadius: 4, fontSize: T.sm, fontFamily: T.mono,
+        overflowX: "auto", margin: 0,
+        whiteSpace: "pre-wrap", wordBreak: "break-all",
+      }}>
+        {codeText}
+      </pre>
+      <div style={{ position: "absolute", top: 6, right: 6, display: "flex", gap: 4 }}>
+        <button
+          onClick={handleCopy}
+          style={{ background: blockCopied ? "#2d5a1b" : "#333", border: "none", color: blockCopied ? "#4EC994" : "#888", fontSize: 10, padding: "3px 7px", cursor: "pointer", fontFamily: T.mono, borderRadius: 3, transition: "all 0.15s" }}
+        >
+          {blockCopied ? "✓" : "Copiar"}
+        </button>
+        <button
+          onClick={() => onSendToTerminal(codeText.trim())}
+          style={{ background: C.olive, border: "none", color: "#fff", fontSize: 10, padding: "3px 7px", cursor: "pointer", fontFamily: T.mono, borderRadius: 3 }}
+        >
+          → Terminal
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Render message — splits on ``` blocks, applies to any role ────────────────
 function renderMessage(content, onSendToTerminal) {
   if (!content) return null;
-
-  // Split on fenced code blocks (``` ... ```)
   const parts = content.split(/(```[\s\S]*?```)/g);
-
   return parts.map((part, i) => {
     if (part.startsWith("```")) {
-      // Strip opening fence (```python, ```py, etc.) and closing ```
-      const code = part.replace(/^```[^\n]*\n?/, "").replace(/\n?```$/, "");
-      return (
-        <div key={i} style={{ position: "relative", margin: `${S.sm}px 0` }}>
-          <pre style={{
-            background: "#1E1E1E", color: "#D4D4D4",
-            padding: `${S.md}px`, borderRadius: 4,
-            fontSize: T.sm, fontFamily: T.mono,
-            overflowX: "auto", margin: 0,
-            whiteSpace: "pre-wrap", wordBreak: "break-all",
-            paddingRight: 80,
-          }}>
-            {code}
-          </pre>
-          <button
-            onClick={() => onSendToTerminal(code.trim())}
-            title="Copiar a la terminal"
-            style={{
-              position: "absolute", top: 6, right: 6,
-              background: C.olive, border: "none",
-              color: "#fff", fontSize: 10,
-              padding: "3px 7px", cursor: "pointer",
-              fontFamily: T.mono, borderRadius: 3,
-              letterSpacing: T.wide,
-              transition: "opacity 0.15s",
-            }}
-          >
-            → Terminal
-          </button>
-        </div>
-      );
+      const codeText = part.replace(/^```[^\n]*\n?/, "").replace(/\n?```$/, "");
+      return <CodeBlock key={i} codeText={codeText} onSendToTerminal={onSendToTerminal} />;
     }
-    return (
-      <span key={i} style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-        {part}
-      </span>
-    );
+    return <span key={i} style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{part}</span>;
   });
 }
 
@@ -156,16 +160,17 @@ TU MISIÓN: Guiar al estudiante a resolver el problema SOLO, sin darle la soluci
     setTutorLoading(false);
   }
 
-  async function sendTutorMessage() {
-    if (!tutorInput.trim() || tutorLoading) return;
+  async function sendTutorMessage(explicitContent) {
+    const content = typeof explicitContent === "string" ? explicitContent : tutorInput;
+    if (!content.trim() || tutorLoading) return;
     const sys = `Eres El Profesor — tutor socrático de programación en español.
 El estudiante está resolviendo: """${tutorInstructions}"""
 TU MISIÓN: Guiar con preguntas, no dar la solución. Máximo 3 líneas. Una pregunta a la vez.`;
 
-    const userMsg = { role: "user", content: tutorInput };
+    const userMsg = { role: "user", content };
     const newHistory = [...tutorHistory, userMsg];
     setTutorHistory([...newHistory, { role: "assistant", content: "" }]);
-    setTutorInput("");
+    if (typeof explicitContent !== "string") setTutorInput(""); // solo limpia si viene del input
     setTutorLoading(true);
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -295,7 +300,7 @@ TU MISIÓN: Guiar con preguntas, no dar la solución. Máximo 3 líneas. Una pre
                         : tutorLoading && i === tutorHistory.length - 1
                           ? <span style={{ color: C.textLight }}>...</span>
                           : null)
-                    : <span style={{ whiteSpace: "pre-wrap" }}>{msg.content}</span>
+                    : renderMessage(msg.content, setCode)
                   }
                 </div>
               </div>
@@ -437,6 +442,13 @@ TU MISIÓN: Guiar con preguntas, no dar la solución. Máximo 3 líneas. Una pre
                 style={{ flex: 1, minHeight: 140, padding: S.sm, background: "#2D2D2D", border: "none", color: "#D4D4D4", fontSize: T.sm, fontFamily: T.mono, resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.6, overflowY: "auto" }}
               />
             </div>
+            <button
+              onClick={() => sendTutorMessage(`\`\`\`python\n${code}\n\`\`\``)}
+              disabled={tutorLoading || !code.trim()}
+              style={{ ...btnPrimary(tutorLoading || !code.trim()), width: "100%", padding: `${S.sm}px`, marginTop: S.xs, fontSize: T.xs, letterSpacing: T.wide, background: (tutorLoading || !code.trim()) ? "#333" : C.burgundy, border: "none" }}
+            >
+              Enviar al Profesor
+            </button>
             <button
               onClick={runPython}
               disabled={!pyodideReady || terminalLoading || !code.trim()}
