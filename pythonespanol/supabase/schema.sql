@@ -5,22 +5,22 @@
 
 -- ── conversations ─────────────────────────────────────────────────────────────
 create table if not exists conversations (
-  id          bigserial    primary key,
-  user_id     uuid         not null references auth.users(id) on delete cascade,
-  fecha       text         not null,
+  id          uuid         default gen_random_uuid() primary key,
+  user_id     uuid         references auth.users(id) on delete cascade,
+  fecha       text,
   codigo      text,
   resumen     text,
-  created_at  timestamptz  default now()
+  response    text,
+  created_at  timestamp    default now()
 );
 
 create index if not exists conversations_user_id_idx on conversations(user_id);
 
 alter table conversations enable row level security;
 
-create policy "users manage own conversations" on conversations
+create policy "users can see own conversations" on conversations
   for all
-  using  (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using (auth.uid() = user_id);
 
 
 -- ── game_stats ────────────────────────────────────────────────────────────────
