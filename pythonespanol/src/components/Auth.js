@@ -34,7 +34,19 @@ export default function Auth() {
 
     if (notFound) {
       const { error: signUpErr } = await supabase.auth.signUp({ email: emailVal, password: passVal });
-      if (signUpErr) setError(signUpErr.message);
+      if (signUpErr) {
+        const alreadyExists =
+          signUpErr.message.toLowerCase().includes("user already registered") ||
+          signUpErr.message.toLowerCase().includes("already registered");
+        if (alreadyExists) {
+          // El usuario existe pero signIn falló → contraseña incorrecta
+          const { error: retryErr } = await supabase.auth.signInWithPassword({ email: emailVal, password: passVal });
+          if (retryErr) setError("Contraseña incorrecta para esta cuenta.");
+          // Si ok → onAuthStateChange dispara solo
+        } else {
+          setError(signUpErr.message);
+        }
+      }
       // Si signUp OK y email confirm está OFF → onAuthStateChange dispara solo
     } else {
       setError(signInErr.message);
