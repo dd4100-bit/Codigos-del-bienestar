@@ -57,8 +57,9 @@ export default function TutorMode({ code, setCode, onClose, runPython, pyodideRe
   const [tutorLoading, setTutorLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const tutorBottomRef = useRef(null);
-  const tutorInputRef  = useRef(null);
+  const tutorBottomRef  = useRef(null);
+  const tutorInputRef   = useRef(null);
+  const lineNumbersRef  = useRef(null);
 
   useEffect(() => {
     if (tutorBottomRef.current) tutorBottomRef.current.scrollIntoView({ behavior: "smooth" });
@@ -273,7 +274,29 @@ TU MISIÓN: Guiar con preguntas, no dar la solución. Máximo 3 líneas. Una pre
                 e.target.style.height = "auto";
                 e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
               }}
-              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendTutorMessage(); } }}
+              onKeyDown={e => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendTutorMessage();
+                } else if (e.key === "Enter" && e.shiftKey) {
+                  e.preventDefault();
+                  const s = e.target.selectionStart;
+                  const indent = tutorInput.substring(0, s).split("\n").pop().match(/^(\s*)/)[1];
+                  const next = tutorInput.substring(0, s) + "\n" + indent + tutorInput.substring(e.target.selectionEnd);
+                  setTutorInput(next);
+                  setTimeout(() => {
+                    e.target.selectionStart = e.target.selectionEnd = s + 1 + indent.length;
+                    e.target.style.height = "auto";
+                    e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+                  }, 0);
+                } else if (e.key === "Tab") {
+                  e.preventDefault();
+                  const s = e.target.selectionStart;
+                  const next = tutorInput.substring(0, s) + "    " + tutorInput.substring(e.target.selectionEnd);
+                  setTutorInput(next);
+                  setTimeout(() => { e.target.selectionStart = e.target.selectionEnd = s + 4; }, 0);
+                }
+              }}
               placeholder="Escribe tu respuesta... (Enter para enviar, Shift+Enter para nueva línea)"
               disabled={tutorLoading}
               style={{ flex: 1, minHeight: 44, maxHeight: 120, padding: `${S.sm}px ${S.md}px`, border: `1px solid ${C.border}`, background: C.cream, color: C.text, fontSize: T.md, fontFamily: T.sans, fontWeight: T.light, resize: "none", outline: "none", borderRadius: 22, lineHeight: 1.6, overflow: "hidden", boxSizing: "border-box" }}
@@ -336,20 +359,45 @@ TU MISIÓN: Guiar con preguntas, no dar la solución. Máximo 3 líneas. Una pre
                 {copied ? "Copiado ✓" : "Copiar"}
               </button>
             </div>
-            <textarea
-              value={code}
-              onChange={e => setCode(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === "Tab") {
-                  e.preventDefault();
-                  const s = e.target.selectionStart;
-                  setCode(c => c.substring(0, s) + "    " + c.substring(e.target.selectionEnd));
-                  setTimeout(() => { e.target.selectionStart = e.target.selectionEnd = s + 4; }, 0);
-                }
-              }}
-              placeholder={"# Escribe o pega código aquí\n# Tab para indentar\n# Shift+Enter = nueva línea"}
-              style={{ width: "100%", minHeight: 140, padding: S.sm, background: "#2D2D2D", border: "1px solid #444", color: "#D4D4D4", fontSize: T.sm, fontFamily: T.mono, resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.6 }}
-            />
+            {/* Line numbers + textarea — scroll in sync */}
+            <div style={{ display: "flex", border: "1px solid #444", minHeight: 140 }}>
+              <div
+                ref={lineNumbersRef}
+                style={{
+                  width: 32, flexShrink: 0,
+                  background: "#1a1a1a", color: "#555",
+                  fontFamily: T.mono, fontSize: T.sm, lineHeight: 1.6,
+                  padding: `${S.sm}px 4px`,
+                  textAlign: "right", userSelect: "none",
+                  overflowY: "hidden",
+                }}
+              >
+                {(code || " ").split("\n").map((_, i) => (
+                  <div key={i}>{i + 1}</div>
+                ))}
+              </div>
+              <textarea
+                value={code}
+                onChange={e => setCode(e.target.value)}
+                onScroll={e => { if (lineNumbersRef.current) lineNumbersRef.current.scrollTop = e.target.scrollTop; }}
+                onKeyDown={e => {
+                  if (e.key === "Tab") {
+                    e.preventDefault();
+                    const s = e.target.selectionStart;
+                    setCode(c => c.substring(0, s) + "    " + c.substring(e.target.selectionEnd));
+                    setTimeout(() => { e.target.selectionStart = e.target.selectionEnd = s + 4; }, 0);
+                  } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    const s = e.target.selectionStart;
+                    const indent = code.substring(0, s).split("\n").pop().match(/^(\s*)/)[1];
+                    setCode(c => c.substring(0, s) + "\n" + indent + c.substring(e.target.selectionEnd));
+                    setTimeout(() => { e.target.selectionStart = e.target.selectionEnd = s + 1 + indent.length; }, 0);
+                  }
+                }}
+                placeholder={"# Escribe o pega código aquí"}
+                style={{ flex: 1, minHeight: 140, padding: S.sm, background: "#2D2D2D", border: "none", color: "#D4D4D4", fontSize: T.sm, fontFamily: T.mono, resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.6, overflowY: "auto" }}
+              />
+            </div>
             <button
               onClick={runPython}
               disabled={!pyodideReady || terminalLoading || !code.trim()}
