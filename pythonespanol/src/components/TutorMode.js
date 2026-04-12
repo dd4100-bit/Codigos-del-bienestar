@@ -55,6 +55,7 @@ export default function TutorMode({ code, setCode, onClose, runPython, pyodideRe
   const [tutorHistory, setTutorHistory] = useState([]);
   const [tutorInput, setTutorInput] = useState("");
   const [tutorLoading, setTutorLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const tutorBottomRef = useRef(null);
   const tutorInputRef  = useRef(null);
@@ -321,6 +322,20 @@ TU MISIÓN: Guiar con preguntas, no dar la solución. Máximo 3 líneas. Una pre
 
           {/* Code editor + run button */}
           <div style={{ padding: S.sm, borderTop: "1px solid #333", flexShrink: 0 }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(code).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  });
+                }}
+                disabled={!code.trim()}
+                style={{ background: "none", border: "1px solid #444", color: copied ? "#4EC994" : "#888", fontSize: 10, padding: "2px 8px", cursor: code.trim() ? "pointer" : "default", fontFamily: T.mono, letterSpacing: T.wide, transition: "color 0.15s" }}
+              >
+                {copied ? "Copiado ✓" : "Copiar"}
+              </button>
+            </div>
             <textarea
               value={code}
               onChange={e => setCode(e.target.value)}
