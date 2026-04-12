@@ -134,7 +134,7 @@ export default function Profesor({ code, setCode, images, setImages, runPython, 
         try {
           const { data, error } = await supabase
             .from("conversations")
-            .select("id, fecha, codigo, resumen")
+            .select("id, fecha, codigo, resumen, response")
             .eq("user_id", user.id)
             .order("created_at", { ascending: false })
             .limit(10);
@@ -169,28 +169,32 @@ export default function Profesor({ code, setCode, images, setImages, runPython, 
   }, [response]);
 
   async function saveToHistorial(codigo, respuesta) {
-    const fecha   = new Date().toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-    const codSnip = codigo.substring(0, 80)  + (codigo.length > 80  ? "..." : "");
-    const resSnip = respuesta.substring(0, 120) + "...";
+    const fecha    = new Date().toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    const codSnip  = codigo.substring(0, 80) + (codigo.length > 80 ? "..." : "");
+    const resSnip  = respuesta.substring(0, 120) + (respuesta.length > 120 ? "..." : "");
 
     if (user?.id) {
-      // Save to Supabase — use the returned id as the local entry id
       try {
-        const { data } = await supabase.from("conversations").insert({
-          user_id: user.id,
+        const { data, error } = await supabase.from("conversations").insert({
+          user_id:  user.id,
           fecha,
-          codigo:  codSnip,
-          resumen: resSnip,
+          codigo:   codSnip,
+          resumen:  resSnip,
+          response: respuesta,          // full response text
         }).select("id").single();
 
-        const entry = { id: data?.id ?? Date.now(), fecha, codigo: codSnip, resumen: resSnip };
+        if (error) console.error("[historial] Supabase insert error:", error.message);
+
+        const entry = { id: data?.id ?? Date.now(), fecha, codigo: codSnip, resumen: resSnip, response: respuesta };
         setHistorial(prev => [entry, ...prev].slice(0, 10));
         return;
-      } catch {}
+      } catch (err) {
+        console.error("[historial] saveToHistorial catch:", err);
+      }
     }
 
-    // Fallback: localStorage-only entry
-    const entry = { id: Date.now(), fecha, codigo: codSnip, resumen: resSnip };
+    // Fallback: localStorage-only
+    const entry = { id: Date.now(), fecha, codigo: codSnip, resumen: resSnip, response: respuesta };
     setHistorial(prev => [entry, ...prev].slice(0, 10));
   }
 

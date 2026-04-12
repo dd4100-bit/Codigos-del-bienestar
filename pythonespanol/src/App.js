@@ -112,6 +112,7 @@ export default function App() {
           terminalOutput={terminalOutput}
           setTerminalOutput={setTerminalOutput}
           terminalLoading={terminalLoading}
+          user={user}
         />
       )}
 

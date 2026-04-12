@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { C, T, S, label, btnPrimary } from "../constants";
+import { supabase } from "../lib/supabase";
 
 // ── Parse assistant message — detect ```code``` blocks and inject "→ Terminal" ─
 function renderMessage(content, onSendToTerminal) {
@@ -50,7 +51,7 @@ function renderMessage(content, onSendToTerminal) {
   });
 }
 
-export default function TutorMode({ code, setCode, onClose, runPython, pyodideReady, terminalOutput, setTerminalOutput, terminalLoading }) {
+export default function TutorMode({ code, setCode, onClose, runPython, pyodideReady, terminalOutput, setTerminalOutput, terminalLoading, user }) {
   const [tutorInstructions] = useState(code);
   const [tutorHistory, setTutorHistory] = useState([]);
   const [tutorInput, setTutorInput] = useState("");
@@ -60,6 +61,29 @@ export default function TutorMode({ code, setCode, onClose, runPython, pyodideRe
   const tutorBottomRef  = useRef(null);
   const tutorInputRef   = useRef(null);
   const lineNumbersRef  = useRef(null);
+
+  // Save tutor session to Supabase then close
+  async function handleClose() {
+    if (user?.id && tutorHistory.length >= 2) {
+      const fecha     = new Date().toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+      const codSnip   = tutorInstructions.substring(0, 80) + (tutorInstructions.length > 80 ? "..." : "");
+      const lastReply = tutorHistory.filter(m => m.role === "assistant").pop()?.content ?? "";
+      const resSnip   = lastReply.substring(0, 120) + (lastReply.length > 120 ? "..." : "");
+
+      try {
+        await supabase.from("conversations").insert({
+          user_id:  user.id,
+          fecha,
+          codigo:   codSnip,
+          resumen:  `[Tutor] ${resSnip}`,
+          response: JSON.stringify(tutorHistory),
+        });
+      } catch (err) {
+        console.error("[tutor] save on exit:", err);
+      }
+    }
+    onClose();
+  }
 
   useEffect(() => {
     if (tutorBottomRef.current) tutorBottomRef.current.scrollIntoView({ behavior: "smooth" });
@@ -206,7 +230,7 @@ TU MISIÓN: Guiar con preguntas, no dar la solución. Máximo 3 líneas. Una pre
           <span style={{ ...label(), color: "rgba(200,151,31,0.5)", fontSize: 8 }}>modo tutor</span>
         </div>
         <button
-          onClick={onClose}
+          onClick={handleClose}
           style={{ background: "none", border: `1px solid rgba(200,151,31,0.4)`, color: C.gold, fontSize: T.xs, padding: `${S.xs}px ${S.md}px`, cursor: "pointer", fontFamily: T.sans, letterSpacing: T.wide, textTransform: "uppercase" }}
         >
           ✕ Salir
