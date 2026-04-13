@@ -90,21 +90,7 @@ async function extractTextFromFile(file) {
 // ── Historial entry component ─────────────────────────────────────────────────
 function HistorialEntry({ entry, onLoadCode, onDelete }) {
   const [expanded, setExpanded] = useState(false);
-  // response can be: full text string, JSON array string (tutor), or null
-  const rawResponse = entry.response;
-  let displayResponse = null;
-  if (rawResponse && typeof rawResponse === "string" && rawResponse.length > 0) {
-    // If it looks like a JSON array (tutor history), extract assistant messages
-    if (rawResponse.trim().startsWith("[")) {
-      try {
-        const msgs = JSON.parse(rawResponse);
-        displayResponse = msgs.filter(m => m.role === "assistant").map(m => m.content).join("\n\n");
-      } catch { displayResponse = rawResponse; }
-    } else {
-      displayResponse = rawResponse;
-    }
-  }
-  const hasResponse = !!displayResponse;
+  const hasResponse = entry.response && typeof entry.response === "string" && entry.response.length > 0;
 
   return (
     <div style={{
@@ -144,7 +130,7 @@ function HistorialEntry({ entry, onLoadCode, onDelete }) {
             <div style={{ padding: `${S.sm}px ${S.md}px`, background: "#1E1E1E", borderBottom: `1px solid #333` }}>
               <div style={{ fontSize: 9, color: C.gold, fontFamily: T.sans, letterSpacing: T.wide, textTransform: "uppercase", marginBottom: S.xs }}>Respuesta completa:</div>
               <div style={{ fontSize: T.xs, color: "#D4D4D4", fontFamily: T.mono, lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: 200, overflowY: "auto" }}>
-                {displayResponse}
+                {entry.response}
               </div>
             </div>
           )}
@@ -194,7 +180,6 @@ export default function Profesor({ code, setCode, images, setImages, runPython, 
   const attachInputRef = useRef(null);
   const responseRef    = useRef(null);
   const intervalRef    = useRef(null);
-  const codeBoxRef     = useRef(null);
 
   // ── Load historial ──────────────────────────────────────────────────────────
   async function loadHistorial() {
@@ -497,7 +482,7 @@ Responde SOLO con este JSON array (sin markdown):
       </div>
 
       {/* MAIN LAYOUT — content + optional historial panel */}
-      <div style={{ display: "flex", minHeight: "calc(100vh - 52px)", position: "relative", paddingRight: historialOpen ? 300 : 0, transition: "padding-right 0.2s ease" }}>
+      <div style={{ display: "flex", minHeight: "calc(100vh - 52px)", position: "relative" }}>
 
         {/* ── MAIN CONTENT ── */}
         <div style={{ flex: 1, minWidth: 0, paddingBottom: 80 }}>
@@ -675,7 +660,7 @@ Responde SOLO con este JSON array (sin markdown):
             </div>
 
             {/* CODE BOX */}
-            <div ref={codeBoxRef} style={{ border: `1px solid ${C.burgundy}`, marginBottom: S.md, boxShadow: `2px 2px 0 ${C.burgundy}` }}>
+            <div style={{ border: `1px solid ${C.burgundy}`, marginBottom: S.md, boxShadow: `2px 2px 0 ${C.burgundy}` }}>
               <div style={{ borderBottom: `1px solid ${C.burgundy}`, padding: `${S.sm}px ${S.lg}px`, display: "flex", justifyContent: "space-between", alignItems: "center", background: C.burgundy }}>
                 <span style={{ ...label(), color: C.gold, fontSize: T.xs, letterSpacing: T.wider }}>
                   {images.length ? `${images.length} foto(s) cargada(s)` : attachedFile ? attachedFile.name : "codigo_sospechoso.py"}
@@ -759,8 +744,8 @@ Responde SOLO con este JSON array (sin markdown):
             background: C.cream,
             display: "flex",
             flexDirection: "column",
-            position: "fixed",
-            top: 0, right: 0, zIndex: 400, boxShadow: "-4px 0 24px rgba(0,0,0,0.15)",
+            position: "sticky",
+            top: 0,
             height: "100vh",
             overflowY: "auto",
             animation: "slideIn 0.2s ease",
@@ -805,7 +790,7 @@ Responde SOLO con este JSON array (sin markdown):
                   <HistorialEntry
                     key={entry.id}
                     entry={entry}
-                    onLoadCode={c => { setCode(c.replace(/\.\.\.$/,"")); setImages([]); setAttachedFile(null); setHistorialOpen(false); setTimeout(() => codeBoxRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 100); }}
+                    onLoadCode={c => { setCode(c.replace(/\.\.\.$/,"")); setImages([]); setAttachedFile(null); }}
                     onDelete={deleteEntry}
                   />
                 ))
