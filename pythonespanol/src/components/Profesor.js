@@ -497,7 +497,7 @@ Responde SOLO con este JSON array (sin markdown):
       </div>
 
       {/* MAIN LAYOUT — content + optional historial panel */}
-      <div style={{ display: "flex", minHeight: "calc(100vh - 52px)", position: "relative" }}>
+      <div style={{ display: "flex", minHeight: "calc(100vh - 52px)", position: "relative", paddingRight: historialOpen ? 300 : 0, transition: "padding-right 0.2s ease" }}>
 
         {/* ── MAIN CONTENT ── */}
         <div style={{ flex: 1, minWidth: 0, paddingBottom: 80 }}>
@@ -759,8 +759,8 @@ Responde SOLO con este JSON array (sin markdown):
             background: C.cream,
             display: "flex",
             flexDirection: "column",
-            position: "sticky",
-            top: 0,
+            position: "fixed",
+            top: 0, right: 0, zIndex: 400, boxShadow: "-4px 0 24px rgba(0,0,0,0.15)",
             height: "100vh",
             overflowY: "auto",
             animation: "slideIn 0.2s ease",
