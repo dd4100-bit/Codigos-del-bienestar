@@ -269,7 +269,16 @@ REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser 
       for (const paso of parsed.pasos) {
         for (const b of paso.blancos) {
           const line = paso.codigo_lineas[b.lineIdx] || "";
-          b.correcta = line.substring(b.charIdx, b.charIdx + b.length);
+          // Fix token: close open parens/brackets and include trailing :
+          let endIdx = b.charIdx + b.length;
+          const token = line.substring(b.charIdx, endIdx);
+          let openParens = (token.match(/\(/g)||[]).length - (token.match(/\)/g)||[]).length;
+          let openBrackets = (token.match(/\[/g)||[]).length - (token.match(/\]/g)||[]).length;
+          while (openParens > 0 && endIdx < line.length) { if (line[endIdx] === ')') openParens--; endIdx++; }
+          while (openBrackets > 0 && endIdx < line.length) { if (line[endIdx] === ']') openBrackets--; endIdx++; }
+          if (endIdx < line.length && line[endIdx] === ':') endIdx++;
+          b.length = endIdx - b.charIdx;
+          b.correcta = line.substring(b.charIdx, endIdx);
           console.log('[blank]', b.blankId, 'correcta:', JSON.stringify(b.correcta));
         }
       }
