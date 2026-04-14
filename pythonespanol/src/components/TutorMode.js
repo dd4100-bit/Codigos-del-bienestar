@@ -256,6 +256,7 @@ El estudiante tiene este problema/código: """${tutorInstructions}"""
 Genera entre 3 y 6 pasos. Cada paso tiene exactamente UN blanco.
 Responde SOLO con JSON válido, sin markdown:
 {"titulo_general":"título","pasos":[{"titulo":"¿Pregunta?","explicacion":"1-2 oraciones.","diagrama":[{"label":"fn","codigo":"def f","active":false},{"label":"retorna","codigo":"return","active":true}],"codigo_lineas":["def f(x):","    return ___"],"blancos":[{"lineIdx":1,"charIdx":11,"length":3,"blankId":"b0","correcta":"x+1"}],"opciones":["x+1","x","return","None"]}]}
+EJEMPLO CRÍTICO: para la línea "except FileNotFoundError:" el blanco es "FileNotFoundError:" (CON los dos puntos), charIdx=7, length=19. La correcta SIEMPRE debe ser exactamente el substring de la línea: line.substring(charIdx, charIdx+length).
 REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser siempre un TOKEN COMPLETO: un operador completo (+=, /, *, ==, etc.), una variable completa (num_tests, student_total, etc.), o un método completo con sus paréntesis (split(','), append(x), etc.). NUNCA pongas el blanco dentro de paréntesis — si el blanco es un argumento, incluye el método completo con paréntesis. NUNCA cortes una palabra a la mitad. Si el token termina con : (como 'FileNotFoundError:' o 'else:'), inclúyelo. charIdx = posición exacta donde empieza el token en la línea. length = longitud exacta del token completo incluyendo puntuación final si es parte de la sintaxis.`;
     try {
       const res  = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }, body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 2000, system: sys, messages: [{ role: "user", content: "Genera los pasos." }] }) });
@@ -264,6 +265,13 @@ REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser 
       if (!match) throw new Error("no json");
       const parsed = JSON.parse(match[0]);
       if (!parsed.pasos?.length) throw new Error("no pasos");
+      // Force correcta to always match exactly what's in the line
+      for (const paso of parsed.pasos) {
+        for (const b of paso.blancos) {
+          const line = paso.codigo_lineas[b.lineIdx] || "";
+          b.correcta = line.substring(b.charIdx, b.charIdx + b.length);
+        }
+      }
       }
       setPasos(parsed);
       resetStep();
