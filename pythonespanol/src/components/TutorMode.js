@@ -271,16 +271,17 @@ REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser 
           const charBefore = line[b.charIdx - 1] || " ";
           const charAfter  = line[b.charIdx + b.length] || " ";
           const wordChar   = /[a-zA-Z0-9_]/;
-          const trailingChar = /[:(,.'"]/;
           if (wordChar.test(charBefore) || wordChar.test(charAfter)) {
             // Blank cuts a word — expand to full token
             let start = b.charIdx;
             let end   = b.charIdx + b.length;
             while (start > 0 && wordChar.test(line[start - 1])) start--;
             while (end < line.length && wordChar.test(line[end])) end++;
-            if (trailingChar.test(line[end])) end++;
+            // Include trailing colon (Python syntax like FileNotFoundError:)
+            if (line[end] === ':') end++;
             b.charIdx = start;
             b.length  = end - start;
+            b.correcta = line.substring(start, end).trim();
           }
         }
       }
