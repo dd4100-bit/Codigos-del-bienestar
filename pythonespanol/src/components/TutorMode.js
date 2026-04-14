@@ -264,25 +264,25 @@ REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser 
       if (!match) throw new Error("no json");
       const parsed = JSON.parse(match[0]);
       if (!parsed.pasos?.length) throw new Error("no pasos");
-      // Validate blanks don't cut words in half
+      // Validate blanks: fix word cuts and include trailing : if part of syntax
       for (const paso of parsed.pasos) {
         for (const b of paso.blancos) {
           const line = paso.codigo_lineas[b.lineIdx] || "";
+          const wordChar = /[a-zA-Z0-9_]/;
           const charBefore = line[b.charIdx - 1] || " ";
           const charAfter  = line[b.charIdx + b.length] || " ";
-          const wordChar   = /[a-zA-Z0-9_]/;
+          let start = b.charIdx;
+          let end   = b.charIdx + b.length;
+          // Expand if cutting a word
           if (wordChar.test(charBefore) || wordChar.test(charAfter)) {
-            // Blank cuts a word — expand to full token
-            let start = b.charIdx;
-            let end   = b.charIdx + b.length;
             while (start > 0 && wordChar.test(line[start - 1])) start--;
             while (end < line.length && wordChar.test(line[end])) end++;
-            // Include trailing colon (Python syntax like FileNotFoundError:)
-            if (line[end] === ':') end++;
-            b.charIdx = start;
-            b.length  = end - start;
-            b.correcta = line.substring(start, end).trim();
           }
+          // Always include trailing : if immediately after the token (Python syntax)
+          if (line[end] === ':') end++;
+          b.charIdx  = start;
+          b.length   = end - start;
+          b.correcta = line.substring(start, end).trim();
         }
       }
       setPasos(parsed);
