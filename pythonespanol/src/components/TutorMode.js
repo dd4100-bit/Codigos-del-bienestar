@@ -375,7 +375,7 @@ REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser 
   // ── Chat ──────────────────────────────────────────────────────────────────────
   async function initChat() {
     const sys = `Eres El Profesor — tutor socrático en español. Estudiante resolviendo: """${tutorInstructions}""" Guía con preguntas, sin dar la solución. Máximo 3 líneas.`;
-    const fm = { role: "user", content: "Quiero resolver este problema." };
+    const fm = { role: "user", content: tutorInstructions };
     setTutorHistory([fm, { role: "assistant", content: "" }]);
     await stream(sys, [fm]);
   }
@@ -458,11 +458,6 @@ REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser 
           {/* ── SCAFFOLD ── */}
           {!chatMode && (
             <div style={{ flex: 1, overflowY: "auto" }}>
-              {/* Banner */}
-              <div style={{ borderBottom: `1px solid ${C.border}`, padding: `${S.xs}px ${S.xl}px`, background: C.creamDark, display: "flex", gap: S.sm }}>
-                <span style={{ color: C.gold, fontSize: T.xs, marginTop: 1, flexShrink: 0 }}>📌</span>
-                <span style={{ fontSize: T.xs, fontFamily: T.mono, color: C.textMid, lineHeight: 1.6 }}>{tutorInstructions.length > 180 ? tutorInstructions.substring(0, 180) + "…" : tutorInstructions}</span>
-              </div>
               {/* Progress */}
               {pasos && (
                 <div style={{ display: "flex", gap: 3, padding: `${S.xs}px ${S.xl}px`, borderBottom: `1px solid ${C.border}`, alignItems: "center" }}>
@@ -543,12 +538,6 @@ REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser 
                 </div>
               )}
               <div style={{ flex: 1, overflowY: "auto", padding: `${S.xl}px ${S.xxl}px` }}>
-                <div style={{ marginBottom: S.xl }}>
-                  <div style={{ background: C.creamDark, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.gold}`, borderRadius: "4px 18px 18px 4px", padding: `${S.md}px ${S.lg}px`, fontSize: T.sm, fontFamily: T.mono, color: C.textMid, lineHeight: 1.7, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                    <span style={{ ...label(), color: C.gold, display: "block", marginBottom: S.xs, fontSize: T.xs }}>📌 Problema:</span>
-                    {tutorInstructions}
-                  </div>
-                </div>
                 {tutorHistory.map((msg, i) => (
                   <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", marginBottom: S.lg }}>
                     {msg.role === "assistant" && <div style={{ width: 32, height: 32, borderRadius: "50%", background: C.burgundy, display: "flex", alignItems: "center", justifyContent: "center", marginRight: S.md, flexShrink: 0, alignSelf: "flex-end", fontSize: 16 }}>👨‍🏫</div>}
