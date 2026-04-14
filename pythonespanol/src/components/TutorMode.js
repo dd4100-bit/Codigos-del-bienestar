@@ -272,7 +272,6 @@ REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser 
           b.correcta = line.substring(b.charIdx, b.charIdx + b.length);
         }
       }
-      }
       setPasos(parsed);
       resetStep();
     } catch { setLoadError("No pude generar los pasos."); setChatMode(true); initChat(); }
