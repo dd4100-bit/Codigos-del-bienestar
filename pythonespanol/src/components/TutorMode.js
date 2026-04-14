@@ -270,6 +270,7 @@ REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser 
         for (const b of paso.blancos) {
           const line = paso.codigo_lineas[b.lineIdx] || "";
           b.correcta = line.substring(b.charIdx, b.charIdx + b.length);
+          console.log('[blank]', b.blankId, 'correcta:', JSON.stringify(b.correcta));
         }
       }
       setPasos(parsed);
