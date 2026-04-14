@@ -18,6 +18,26 @@ const REACTIONS = {
 };
 function getRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
+function assembleFullCode(pasos) {
+  if (!pasos?.pasos?.length) return "";
+  const seen = new Set();
+  const out  = [];
+  for (const paso of pasos.pasos) {
+    const lines = [...(paso.codigo_lineas || [])];
+    for (const b of paso.blancos || []) {
+      const ln = lines[b.lineIdx];
+      if (ln != null) lines[b.lineIdx] = ln.substring(0, b.charIdx) + b.correcta + ln.substring(b.charIdx + b.length);
+    }
+    for (const ln of lines) {
+      const key = ln.trimEnd();
+      if (key && seen.has(key)) continue;
+      if (key) seen.add(key);
+      out.push(ln);
+    }
+  }
+  return out.join("\n");
+}
+
 // ── Flow diagram ──────────────────────────────────────────────────────────────
 function FlowDiagram({ nodes }) {
   if (!nodes?.length) return null;
@@ -209,6 +229,8 @@ export default function TutorMode({ code, setCode, onClose, runPython, pyodideRe
   const [tutorHistory, setTutorHistory] = useState([]);
   const [tutorInput, setTutorInput]   = useState("");
   const [tutorLoading, setTutorLoading] = useState(false);
+  const [challengeMode, setChallengeMode] = useState(false);
+  const fullCodeRef                    = useRef("");
 
   // Terminal
   const [termCopied, setTermCopied]   = useState(false);
@@ -397,8 +419,22 @@ REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser 
   // ── Next step ─────────────────────────────────────────────────────────────────
   function handleNext() {
     const ni = pasoIdx + 1;
-    if (ni >= pasos.pasos.length) { setAllDone(true); setChatMode(true); initChatFromSuccess(); }
+    if (ni >= pasos.pasos.length) {
+      const full = assembleFullCode(pasos);
+      fullCodeRef.current = full;
+      setCode(full);
+      setAllDone(true);
+      setChallengeMode(true);
+      setChatMode(true);
+      initChatChallenge(full);
+    }
     else { setPasoIdx(ni); resetStep(); }
+  }
+
+  function startChallenge() {
+    setCode("");
+    setTerminalOutput([]);
+    setTimeout(() => { const ta = document.querySelector('textarea[placeholder^="# Escribe"]'); ta?.focus(); }, 100);
   }
 
   const currentPaso = pasos?.pasos?.[pasoIdx];
@@ -411,9 +447,16 @@ REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser 
     await stream(sys, [fm]);
   }
 
-  async function initChatFromSuccess() {
-    const sys = `Eres El Profesor. Estudiante completó andamiaje de: """${tutorInstructions}""" Felicítalo con energía, explica brevemente por qué funciona. 3 líneas.`;
-    const fm = { role: "user", content: "¡Terminé todos los pasos!" };
+  async function initChatChallenge(fullCode) {
+    const sys = `Eres El Profesor — tutor socrático en español. El estudiante acaba de terminar el andamiaje del problema: """${tutorInstructions}"""
+La solución completa (ya cargada en su terminal como referencia) es:
+\`\`\`python
+${fullCode}
+\`\`\`
+Ahora comienza un RETO GUIADO: el estudiante debe estudiar brevemente el código, luego borrar el terminal y reescribir el programa COMPLETO desde cero, por su cuenta.
+Tu rol: guiar con preguntas socráticas, una a la vez. NUNCA des la solución directa ni líneas de código completas. Ofrece pistas conceptuales si se atasca.
+Responde ahora con 3–4 líneas: felicítalo por los pasos, dile que ve el código completo en el terminal a la derecha, que lo estudie y lo borre para escribirlo él mismo, y termina con UNA pregunta guía ("¿con qué línea empezarías y por qué?").`;
+    const fm = { role: "user", content: "¡Terminé los pasos! Listo para el reto." };
     setTutorHistory([fm, { role: "assistant", content: "" }]);
     await stream(sys, [fm]);
   }
@@ -421,7 +464,14 @@ REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser 
   async function sendChat(explicit) {
     const content = typeof explicit === "string" ? explicit : tutorInput;
     if (!content.trim() || tutorLoading) return;
-    const sys = `Eres El Profesor — tutor socrático en español. Estudiante resolviendo: """${tutorInstructions}""" Máximo 3 líneas.`;
+    const sys = challengeMode
+      ? `Eres El Profesor — tutor socrático en español. RETO: el estudiante escribe desde cero el programa completo para: """${tutorInstructions}"""
+Solución de referencia (NO la reveles literal):
+\`\`\`python
+${fullCodeRef.current}
+\`\`\`
+Guía con preguntas socráticas, una a la vez. Nunca pegues líneas completas de la solución. Si envía código, señala qué va bien y haz UNA pregunta sobre lo que falta o lo que podría fallar. Máximo 3 líneas.`
+      : `Eres El Profesor — tutor socrático en español. Estudiante resolviendo: """${tutorInstructions}""" Máximo 3 líneas.`;
     const um = { role: "user", content };
     const nh = [...tutorHistory, um];
     setTutorHistory([...nh, { role: "assistant", content: "" }]);
@@ -563,9 +613,16 @@ REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser 
           {chatMode && (
             <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
               {allDone && (
-                <div style={{ background: `${C.olive}18`, borderBottom: `1px solid ${C.olive}`, padding: `${S.sm}px ${S.xl}px`, display: "flex", gap: S.sm, alignItems: "center" }}>
-                  <span style={{ fontSize: 16 }}>🎉</span>
-                  <span style={{ fontSize: T.sm, color: C.olive, fontFamily: T.sans, fontWeight: T.bold }}>¡Terminaste! {totalXP} XP ganados</span>
+                <div style={{ background: `${C.olive}18`, borderBottom: `1px solid ${C.olive}`, padding: `${S.sm}px ${S.xl}px`, display: "flex", gap: S.md, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 16 }}>🎯</span>
+                  <span style={{ fontSize: T.sm, color: C.olive, fontFamily: T.sans, fontWeight: T.bold }}>
+                    {challengeMode ? `Reto final — reescribe el programa desde cero · ${totalXP} XP` : `¡Terminaste! ${totalXP} XP ganados`}
+                  </span>
+                  {challengeMode && (
+                    <button onClick={startChallenge} style={{ marginLeft: "auto", background: C.burgundy, border: "none", color: C.gold, padding: `${S.xs}px ${S.md}px`, borderRadius: 14, cursor: "pointer", fontSize: T.xs, fontFamily: T.sans, fontWeight: T.bold, letterSpacing: T.wide, textTransform: "uppercase" }}>
+                      🧹 Limpiar terminal y empezar
+                    </button>
+                  )}
                 </div>
               )}
               <div style={{ flex: 1, overflowY: "auto", padding: `${S.xl}px ${S.xxl}px` }}>
