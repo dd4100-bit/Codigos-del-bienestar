@@ -256,7 +256,7 @@ El estudiante tiene este problema/código: """${tutorInstructions}"""
 Genera entre 3 y 6 pasos. Cada paso tiene exactamente UN blanco.
 Responde SOLO con JSON válido, sin markdown:
 {"titulo_general":"título","pasos":[{"titulo":"¿Pregunta?","explicacion":"1-2 oraciones.","diagrama":[{"label":"fn","codigo":"def f","active":false},{"label":"retorna","codigo":"return","active":true}],"codigo_lineas":["def f(x):","    return ___"],"blancos":[{"lineIdx":1,"charIdx":11,"length":3,"blankId":"b0","correcta":"x+1"}],"opciones":["x+1","x","return","None"]}]}
-REGLAS: exactamente 4 opciones, 1 blanco por paso, charIdx = posición exacta de ___ en la línea.`;
+REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser siempre un TOKEN COMPLETO: un operador completo (+=, /, *, ==, etc.), una variable completa (num_tests, student_total, etc.), o una función completa. NUNCA cortes una palabra a la mitad. charIdx = posición exacta donde empieza el token completo en la línea. length = longitud exacta del token completo.`;
     try {
       const res  = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }, body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 2000, system: sys, messages: [{ role: "user", content: "Genera los pasos." }] }) });
       const data = await res.json();
