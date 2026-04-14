@@ -257,8 +257,13 @@ Genera entre 3 y 6 pasos. Cada paso tiene exactamente UN blanco.
 Responde SOLO con JSON válido, sin markdown:
 {"titulo_general":"título","pasos":[{"titulo":"¿Pregunta?","explicacion":"1-2 oraciones.","diagrama":[{"label":"fn","codigo":"def f","active":false},{"label":"retorna","codigo":"return","active":true}],"codigo_lineas":["def f(x):","    return x+1"],"blancos":[{"lineIdx":1,"charIdx":11,"length":3,"blankId":"b0","correcta":"x+1"}],"opciones":["x+1","x","return","None"]}]}
 IMPORTANTE: codigo_lineas debe contener el código COMPLETO y REAL sin placeholders. NO uses ___ en codigo_lineas. El blanco se genera visualmente usando charIdx y length.
+EJEMPLOS DE BLANCOS CORRECTOS:
+- Para enseñar +=: línea "modified_content += '!'" → blanco en "+=" (charIdx=17, length=2, correcta="+=")
+- Para enseñar FileNotFoundError:: línea "except FileNotFoundError:" → blanco en "FileNotFoundError:" (charIdx=7, length=18, correcta="FileNotFoundError:")
+- Para enseñar split: línea "parts = user_data.split(',')" → blanco en "split(',')" (charIdx=18, length=10, correcta="split(',')")
+NUNCA pongas el blanco en un espacio vacío entre tokens.
 EJEMPLO CRÍTICO: para la línea "except FileNotFoundError:" el blanco es "FileNotFoundError:" (CON los dos puntos), charIdx=7, length=19. La correcta SIEMPRE debe ser exactamente el substring de la línea: line.substring(charIdx, charIdx+length).
-REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser siempre un TOKEN COMPLETO: un operador completo (+=, /, *, ==, etc.), una variable completa (num_tests, student_total, etc.), o un método completo con sus paréntesis (split(','), append(x), etc.). NUNCA pongas el blanco dentro de paréntesis — si el blanco es un argumento, incluye el método completo con paréntesis. NUNCA cortes una palabra a la mitad. Si el token termina con : (como 'FileNotFoundError:' o 'else:'), inclúyelo. charIdx = posición exacta donde empieza el token en la línea. length = longitud exacta del token completo incluyendo puntuación final si es parte de la sintaxis.`;
+REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser siempre un TOKEN COMPLETO: un operador completo (+=, /, *, ==, etc.), una variable completa (num_tests, student_total, etc.), o un método completo con sus paréntesis (split(','), append(x), etc.). NUNCA pongas el blanco dentro de paréntesis — si el blanco es un argumento, incluye el método completo con paréntesis. NUNCA cortes una palabra a la mitad. NUNCA uses el operador = de asignación como blanco — no es pedagógico. Los operadores compuestos como +=, -=, *=, /=, ==, !=, <=, >= son INDIVISIBLES — nunca los partas en dos caracteres. El blanco SIEMPRE debe coincidir exactamente con el nodo activo del diagrama. Si el diagrama muestra += como activo, la línea debe ser 'variable += valor' y el blanco debe ser +=. El codigo_lineas debe estar escrito para que el blanco sea el concepto que se enseña, no un fragmento aleatorio. Si el token termina con : (como 'FileNotFoundError:' o 'else:'), inclúyelo. charIdx = posición exacta donde empieza el token en la línea. length = longitud exacta del token completo incluyendo puntuación final si es parte de la sintaxis.`;
     try {
       const res  = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }, body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 2000, system: sys, messages: [{ role: "user", content: "Genera los pasos." }] }) });
       const data = await res.json();
@@ -266,6 +271,7 @@ REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser 
       if (!match) throw new Error("no json");
       const parsed = JSON.parse(match[0]);
       if (!parsed.pasos?.length) throw new Error("no pasos");
+
       // Force correcta to always match exactly what's in the line
       for (const paso of parsed.pasos) {
         for (const b of paso.blancos) {
@@ -283,6 +289,8 @@ REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser 
           if (endIdx < line.length && line[endIdx] === ':') endIdx++;
           b.charIdx = startIdx;
           b.length = endIdx - startIdx;
+          // Fix compound operators: if token ends with +,-,*,/,!,<,> and next char is =, include it
+          if (endIdx < line.length && line[endIdx] === '=' && '+-*/<>!'.includes(line[endIdx-1])) endIdx++;
           b.correcta = line.substring(startIdx, endIdx).trim();
           console.log('[blank]', b.blankId, 'correcta:', JSON.stringify(b.correcta));
         }
@@ -614,3 +622,4 @@ REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser 
     </div>
   );
 }
+
