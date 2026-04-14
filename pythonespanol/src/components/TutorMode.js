@@ -264,25 +264,32 @@ REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser 
       if (!match) throw new Error("no json");
       const parsed = JSON.parse(match[0]);
       if (!parsed.pasos?.length) throw new Error("no pasos");
-      // Validate blanks: fix word cuts and include trailing : if part of syntax
+      console.log('[TutorMode] pasos generados:', JSON.stringify(parsed.pasos.map(p => p.blancos), null, 2));
+      // Validate blanks: only fix display (charIdx/length), never overwrite correcta
       for (const paso of parsed.pasos) {
         for (const b of paso.blancos) {
           const line = paso.codigo_lineas[b.lineIdx] || "";
           const wordChar = /[a-zA-Z0-9_]/;
           const charBefore = line[b.charIdx - 1] || " ";
           const charAfter  = line[b.charIdx + b.length] || " ";
-          let start = b.charIdx;
-          let end   = b.charIdx + b.length;
-          // Expand if cutting a word
+          // Only expand display if blank cuts a word
           if (wordChar.test(charBefore) || wordChar.test(charAfter)) {
+            let start = b.charIdx;
+            let end   = b.charIdx + b.length;
             while (start > 0 && wordChar.test(line[start - 1])) start--;
             while (end < line.length && wordChar.test(line[end])) end++;
+            if (line[end] === ':') end++;
+            b.charIdx  = start;
+            b.length   = end - start;
+            // Update correcta to match the actual token in the line
+            b.correcta = line.substring(start, end).trim();
           }
-          // Always include trailing : if immediately after the token (Python syntax)
-          if (line[end] === ':') end++;
-          b.charIdx  = start;
-          b.length   = end - start;
-          b.correcta = line.substring(start, end).trim();
+          // If correcta doesn't have trailing : but line does right after token, add it
+          const endIdx = b.charIdx + b.length;
+          if (!b.correcta.endsWith(':') && line[endIdx] === ':') {
+            b.length   += 1;
+            b.correcta  = b.correcta + ':';
+          }
         }
       }
       setPasos(parsed);
