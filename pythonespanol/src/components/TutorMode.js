@@ -281,7 +281,6 @@ REGLAS CRÍTICAS: exactamente 4 opciones, 1 blanco por paso. El blanco debe ser 
             if (trailingChar.test(line[end])) end++;
             b.charIdx = start;
             b.length  = end - start;
-            b.correcta = line.substring(start, end);
           }
         }
       }
