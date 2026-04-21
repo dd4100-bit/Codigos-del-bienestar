@@ -480,9 +480,27 @@ Guía con preguntas socráticas, una a la vez. Nunca pegues líneas completas de
   }
 
   async function stream(sys, messages) {
+    // Anthropic devuelve 400 si un mensaje tiene content vacío o si dos mensajes
+    // consecutivos comparten role. El placeholder assistant que sendChat mete en
+    // tutorHistory queda vacío cuando un stream previo falla, así que saneamos aquí.
+    const clean = [];
+    for (const m of messages) {
+      const text = typeof m.content === "string" ? m.content : "";
+      if (!text.trim()) continue;
+      if (clean.length && clean[clean.length - 1].role === m.role) {
+        clean[clean.length - 1] = { role: m.role, content: clean[clean.length - 1].content + "\n\n" + text };
+      } else {
+        clean.push({ role: m.role, content: text });
+      }
+    }
+    if (!clean.length) {
+      setTutorHistory(p => { const u = [...p]; if (u.length) u[u.length - 1] = { role: "assistant", content: "Escribe algo para empezar." }; return u; });
+      return;
+    }
     setTutorLoading(true);
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }, body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 300, stream: true, system: sys, messages }) });
+      const res = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }, body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 300, stream: true, system: sys, messages: clean }) });
+      if (!res.ok) { const errText = await res.text().catch(() => ""); throw new Error(`HTTP ${res.status} ${errText.slice(0, 200)}`); }
       const reader = res.body.getReader(); const dec = new TextDecoder(); let full = "";
       while (true) {
         const { done, value } = await reader.read(); if (done) break;
@@ -491,7 +509,12 @@ Guía con preguntas socráticas, una a la vez. Nunca pegues líneas completas de
           try { const d = JSON.parse(j).delta?.text; if (d) { full += d; setTutorHistory(p => { const u = [...p]; u[u.length - 1] = { role: "assistant", content: full }; return u; }); } } catch {}
         }
       }
-    } catch { setTutorHistory(p => { const u = [...p]; u[u.length - 1] = { role: "assistant", content: "Se cayó la conexión." }; return u; }); }
+      // Sin deltas → reemplaza el placeholder para que no corrompa el próximo envío.
+      if (!full) setTutorHistory(p => { const u = [...p]; u[u.length - 1] = { role: "assistant", content: "(sin respuesta)" }; return u; });
+    } catch (e) {
+      console.error("stream error:", e);
+      setTutorHistory(p => { const u = [...p]; u[u.length - 1] = { role: "assistant", content: "Se cayó la conexión." }; return u; });
+    }
     setTutorLoading(false);
   }
 
